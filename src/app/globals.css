@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sarabun);
+  --color-income: #16A34A;
+  --color-expense: #DC2626;
+  --color-balance: #2563EB;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* ซ่อน scrollbar สำหรับ horizontal scroll menus */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

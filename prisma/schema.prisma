@@ -1,0 +1,125 @@
+// MChat — Prisma Schema
+// Database: PostgreSQL (Supabase)
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─── Users ───────────────────────────────────────────────
+model User {
+  id           String        @id @default(uuid())
+  name         String
+  email        String        @unique
+  passwordHash String?
+  currency     String        @default("THB")
+  monthStart   Int           @default(1) // วันเริ่มต้นเดือนบัญชี
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  accounts     Account[]
+  categories   Category[]
+  transactions Transaction[]
+  debts        Debt[]
+}
+
+// ─── Accounts ─────────────────────────────────────────────
+// บัญชีเงิน: สด, ธนาคาร, ร้าน, สวน ฯลฯ
+model Account {
+  id             String   @id @default(uuid())
+  userId         String
+  name           String
+  type           String   // cash | bank | wallet | business | farm | other
+  openingBalance Decimal  @default(0) @db.Decimal(18, 2)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User     @relation(fields: [userId], references: [id])
+}
+
+// ─── Categories ───────────────────────────────────────────
+model Category {
+  id        String   @id @default(uuid())
+  userId    String?  // null = default category (ทุกคนใช้ได้)
+  name      String
+  type      String   // income | expense | transfer | debt
+  color     String?
+  icon      String?
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User?             @relation(fields: [userId], references: [id])
+  keywords     CategoryKeyword[]
+  transactions Transaction[]
+}
+
+// ─── Category Keywords ────────────────────────────────────
+// Keywords สำหรับ parser ตรวจจับหมวดหมู่
+model CategoryKeyword {
+  id         String   @id @default(uuid())
+  categoryId String
+  keyword    String
+  createdAt  DateTime @default(now())
+
+  category   Category @relation(fields: [categoryId], references: [id])
+}
+
+// ─── Transactions ─────────────────────────────────────────
+model Transaction {
+  id              String   @id @default(uuid())
+  userId          String
+  accountId       String?
+  categoryId      String?
+  transactionDate DateTime @db.Date
+  type            String   // income | expense | transfer | debt
+  amount          Decimal  @db.Decimal(18, 2)
+  description     String?
+  rawText         String?  // ข้อความที่ผู้ใช้พิมพ์ต้นฉบับ
+  paymentMethod   String?  // cash | bank_transfer | card | unknown
+  status          String   @default("confirmed") // draft | confirmed | deleted
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id])
+  category Category? @relation(fields: [categoryId], references: [id])
+}
+
+// ─── Transfers ────────────────────────────────────────────
+// โอนเงินระหว่างบัญชี (ไม่นับเป็นรายรับ/รายจ่าย)
+model Transfer {
+  id            String   @id @default(uuid())
+  userId        String
+  fromAccountId String
+  toAccountId   String
+  transactionId String   @unique
+  amount        Decimal  @db.Decimal(18, 2)
+  transferDate  DateTime @db.Date
+  description   String?
+  createdAt     DateTime @default(now())
+}
+
+// ─── Debts ────────────────────────────────────────────────
+// ลูกหนี้ / เจ้าหนี้
+model Debt {
+  id              String    @id @default(uuid())
+  userId          String
+  personName      String?
+  debtType        String    // borrowed_from_other | lent_to_other | receivable | payable
+  amount          Decimal   @db.Decimal(18, 2)
+  remainingAmount Decimal   @db.Decimal(18, 2)
+  dueDate         DateTime? @db.Date
+  status          String    @default("open") // open | partial | paid | cancelled
+  description     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id])
+}
