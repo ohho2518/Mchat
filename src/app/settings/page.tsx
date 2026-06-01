@@ -1,11 +1,11 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { LogOut, Pencil, X, Check, Info } from 'lucide-react'
+import { LogOut, Pencil, X, Check, Info, Download } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -34,6 +34,24 @@ export default function SettingsPage() {
   const [editPass, setEditPass] = useState(false)
   const [nameSuccess, setNameSuccess] = useState(false)
   const [passSuccess, setPassSuccess] = useState(false)
+  const [installPrompt, setInstallPrompt] = useState<any>(null)
+  const [isInstalled, setIsInstalled] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    window.addEventListener('appinstalled', () => setIsInstalled(true))
+    if (window.matchMedia('(display-mode: standalone)').matches) setIsInstalled(true)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  const handleInstall = async () => {
+    if (!installPrompt) return
+    installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    if (outcome === 'accepted') setIsInstalled(true)
+    setInstallPrompt(null)
+  }
 
   const nameForm = useForm<ProfileForm>({
     resolver: zodResolver(ProfileSchema),
@@ -212,6 +230,17 @@ export default function SettingsPage() {
           <span>MChat v1.0.0 — บันทึกรายรับรายจ่ายด้วยแชท</span>
         </div>
       </Card>
+
+      {/* Install PWA */}
+      {!isInstalled && installPrompt && (
+        <Button size="lg" className="w-full bg-green-600 hover:bg-green-700" onClick={handleInstall}>
+          <Download className="h-4 w-4" />
+          ติดตั้งแอปบนมือถือ
+        </Button>
+      )}
+      {isInstalled && (
+        <p className="text-center text-sm text-green-600">✓ ติดตั้งแอปแล้ว</p>
+      )}
 
       {/* Logout */}
       <Button variant="danger" size="lg" className="w-full" onClick={handleLogout}>
