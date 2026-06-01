@@ -37,7 +37,7 @@ export default function RootLayout({
   return (
     <html lang="th" className={`${sarabun.variable} h-full antialiased`}>
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-180.svg" />
+        <link rel="apple-touch-icon" href="/icons/icon-180.png" />
       </head>
       <body className="h-full font-sans">
         <Providers>
