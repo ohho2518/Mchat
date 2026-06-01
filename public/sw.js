@@ -1,46 +1,43 @@
-const CACHE = 'mchat-v1'
-const OFFLINE_URL = '/chat'
+const CACHE = 'mchat-v2'
 
+// pre-cache เฉพาะ static assets เท่านั้น
 const PRECACHE = [
-  '/',
-  '/chat',
-  '/dashboard',
-  '/transactions',
   '/manifest.json',
-  '/icons/icon-192.svg',
-  '/icons/icon-512.svg',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
 ]
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then((c) => c.addAll(PRECACHE))
+      .then(() => self.skipWaiting())
   )
 })
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   )
 })
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return
   const url = new URL(e.request.url)
-
-  // API calls — network only (ไม่ cache)
-  if (url.pathname.startsWith('/api/')) return
+  // ไม่ intercept API, auth, หรือ cross-origin
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/')) return
+  if (url.origin !== self.location.origin) return
 
   e.respondWith(
     fetch(e.request)
       .then((res) => {
-        if (res.ok) {
-          const clone = res.clone()
-          caches.open(CACHE).then((c) => c.put(e.request, clone))
+        if (res.ok && res.status === 200) {
+          caches.open(CACHE).then((c) => c.put(e.request, res.clone()))
         }
         return res
       })
-      .catch(() => caches.match(e.request).then((cached) => cached ?? caches.match(OFFLINE_URL)))
+      .catch(() => caches.match(e.request))
   )
 })

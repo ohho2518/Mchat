@@ -232,14 +232,28 @@ export default function SettingsPage() {
       </Card>
 
       {/* Install PWA */}
-      {!isInstalled && installPrompt && (
+      {isInstalled ? (
+        <p className="text-center text-sm text-green-600">✓ ติดตั้งแอปแล้ว</p>
+      ) : installPrompt ? (
         <Button size="lg" className="w-full bg-green-600 hover:bg-green-700" onClick={handleInstall}>
           <Download className="h-4 w-4" />
           ติดตั้งแอปบนมือถือ
         </Button>
-      )}
-      {isInstalled && (
-        <p className="text-center text-sm text-green-600">✓ ติดตั้งแอปแล้ว</p>
+      ) : (
+        <Card>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Download className="h-4 w-4 text-blue-600" />
+              <p className="text-sm font-medium text-gray-700">ติดตั้งเป็นแอป</p>
+            </div>
+            <p className="text-xs text-gray-500">
+              Android: กด ⋮ เมนู → <strong>เพิ่มลงในหน้าจอหลัก</strong>
+            </p>
+            <p className="text-xs text-gray-500">
+              iOS: กด Share → <strong>Add to Home Screen</strong>
+            </p>
+          </div>
+        </Card>
       )}
 
       {/* Logout */}
