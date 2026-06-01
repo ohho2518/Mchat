@@ -9,16 +9,17 @@ interface VoiceInputButtonProps {
 }
 
 export function VoiceInputButton({ onResult, disabled }: VoiceInputButtonProps) {
-  const [supported, setSupported]   = useState(false)
-  const [listening, setListening]   = useState(false)
-  const recRef     = useRef<any>(null)
-  const silenceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const resultRef  = useRef<string>('')
+  const [supported, setSupported] = useState(false)
+  const [listening, setListening] = useState(false)
+  const recRef      = useRef<any>(null)
+  const activeRef   = useRef(false)   // user กำลัง record อยู่จริง
+  const resultRef   = useRef('')
+  const silenceRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
     setSupported(!!SR)
-    return () => clearSilence()
+    return () => { activeRef.current = false; clearSilence() }
   }, [])
 
   const clearSilence = () => {
@@ -27,57 +28,73 @@ export function VoiceInputButton({ onResult, disabled }: VoiceInputButtonProps) 
 
   const resetSilenceTimer = () => {
     clearSilence()
-    // auto-stop หลังเงียบ 3 วิ
-    silenceRef.current = setTimeout(() => stopRec(), 3000)
+    silenceRef.current = setTimeout(() => {
+      activeRef.current = false
+      recRef.current?.stop()
+    }, 4000)   // 4 วิ ไม่มีเสียง → หยุด
   }
 
-  const stopRec = () => {
-    clearSilence()
-    recRef.current?.stop()
-  }
-
-  const toggle = () => {
-    if (listening) { stopRec(); return }
-
+  const startRec = () => {
     const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
-    if (!SR) return
+    if (!SR || !activeRef.current) return
 
     const rec = new SR()
     rec.lang           = 'th-TH'
-    rec.continuous     = true    // ไม่หยุดเองหลังเงียบ
-    rec.interimResults = true    // รับผลระหว่างพูด
-    recRef.current  = rec
-    resultRef.current = ''
+    rec.continuous     = true
+    rec.interimResults = false
+    recRef.current = rec
 
     rec.onresult = (e: any) => {
-      // รวม final results ทั้งหมด
-      let finals = ''
+      let text = ''
       for (let i = 0; i < e.results.length; i++) {
-        if (e.results[i].isFinal) finals += e.results[i][0].transcript
+        if (e.results[i].isFinal) text += e.results[i][0].transcript
       }
-      if (finals) resultRef.current = finals
+      if (text) resultRef.current += (resultRef.current ? ' ' : '') + text
       resetSilenceTimer()
     }
 
-    rec.onspeechstart = () => resetSilenceTimer()
-
     rec.onend = () => {
-      clearSilence()
-      setListening(false)
-      if (resultRef.current.trim()) onResult(resultRef.current.trim())
-      resultRef.current = ''
+      // ถ้า user ยังไม่กดหยุด → restart อัตโนมัติ
+      if (activeRef.current) {
+        setTimeout(() => startRec(), 200)
+      } else {
+        clearSilence()
+        setListening(false)
+        if (resultRef.current.trim()) {
+          onResult(resultRef.current.trim())
+        }
+        resultRef.current = ''
+      }
     }
 
     rec.onerror = (e: any) => {
-      if (e.error === 'no-speech') { stopRec(); return }
-      clearSilence()
-      setListening(false)
-      resultRef.current = ''
+      if (e.error === 'aborted') return
+      if (activeRef.current) {
+        setTimeout(() => startRec(), 300)
+      } else {
+        clearSilence()
+        setListening(false)
+        resultRef.current = ''
+      }
     }
 
-    rec.start()
-    setListening(true)
-    resetSilenceTimer()
+    try {
+      rec.start()
+      resetSilenceTimer()
+    } catch { /* already started */ }
+  }
+
+  const toggle = () => {
+    if (listening) {
+      activeRef.current = false
+      clearSilence()
+      recRef.current?.stop()
+    } else {
+      activeRef.current  = true
+      resultRef.current  = ''
+      setListening(true)
+      startRec()
+    }
   }
 
   if (!supported) return null
