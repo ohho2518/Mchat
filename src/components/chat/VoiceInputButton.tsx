@@ -9,42 +9,75 @@ interface VoiceInputButtonProps {
 }
 
 export function VoiceInputButton({ onResult, disabled }: VoiceInputButtonProps) {
-  const [supported, setSupported] = useState(false)
-  const [listening, setListening]  = useState(false)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recRef = useRef<any>(null)
+  const [supported, setSupported]   = useState(false)
+  const [listening, setListening]   = useState(false)
+  const recRef     = useRef<any>(null)
+  const silenceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resultRef  = useRef<string>('')
 
   useEffect(() => {
-    // Firefox ไม่รองรับ SpeechRecognition → ซ่อนปุ่มอัตโนมัติ
-    const SR = (window as Window & typeof globalThis & { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }).SpeechRecognition
-      ?? (window as Window & typeof globalThis & { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition
+    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
     setSupported(!!SR)
+    return () => clearSilence()
   }, [])
 
+  const clearSilence = () => {
+    if (silenceRef.current) clearTimeout(silenceRef.current)
+  }
+
+  const resetSilenceTimer = () => {
+    clearSilence()
+    // auto-stop หลังเงียบ 3 วิ
+    silenceRef.current = setTimeout(() => stopRec(), 3000)
+  }
+
+  const stopRec = () => {
+    clearSilence()
+    recRef.current?.stop()
+  }
+
   const toggle = () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (listening) { stopRec(); return }
+
     const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
     if (!SR) return
 
-    if (listening) {
-      recRef.current?.stop()
-      setListening(false)
-      return
+    const rec = new SR()
+    rec.lang           = 'th-TH'
+    rec.continuous     = true    // ไม่หยุดเองหลังเงียบ
+    rec.interimResults = true    // รับผลระหว่างพูด
+    recRef.current  = rec
+    resultRef.current = ''
+
+    rec.onresult = (e: any) => {
+      // รวม final results ทั้งหมด
+      let finals = ''
+      for (let i = 0; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finals += e.results[i][0].transcript
+      }
+      if (finals) resultRef.current = finals
+      resetSilenceTimer()
     }
 
-    const rec = new SR()
-    rec.lang = 'th-TH'
-    rec.continuous = false
-    rec.interimResults = false
-    recRef.current = rec
+    rec.onspeechstart = () => resetSilenceTimer()
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rec.onresult = (e: any) => onResult(e.results[0][0].transcript as string)
-    rec.onend    = () => setListening(false)
-    rec.onerror  = () => setListening(false)
+    rec.onend = () => {
+      clearSilence()
+      setListening(false)
+      if (resultRef.current.trim()) onResult(resultRef.current.trim())
+      resultRef.current = ''
+    }
+
+    rec.onerror = (e: any) => {
+      if (e.error === 'no-speech') { stopRec(); return }
+      clearSilence()
+      setListening(false)
+      resultRef.current = ''
+    }
 
     rec.start()
     setListening(true)
+    resetSilenceTimer()
   }
 
   if (!supported) return null
@@ -61,7 +94,7 @@ export function VoiceInputButton({ onResult, disabled }: VoiceInputButtonProps) 
           : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600',
         'disabled:opacity-50 disabled:cursor-not-allowed'
       )}
-      title={listening ? 'หยุดฟัง' : 'พูดได้เลย'}
+      title={listening ? 'กดเพื่อหยุด' : 'กดแล้วพูด'}
     >
       {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
     </button>
