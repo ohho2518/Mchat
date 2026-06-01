@@ -1,0 +1,25 @@
+{
+  "name": "MChat — บันทึกรายรับรายจ่าย",
+  "short_name": "MChat",
+  "description": "บันทึกรายรับรายจ่ายด้วยการพิมพ์ภาษาไทยธรรมชาติ",
+  "start_url": "/chat",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563EB",
+  "orientation": "portrait",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
