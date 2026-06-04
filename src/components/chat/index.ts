@@ -1,4 +1,5 @@
 export { ChatInput } from './ChatInput'
 export { ChatMessage } from './ChatMessage'
+export { DateContextBar } from './DateContextBar'
 export { ParsedTransactionCard } from './ParsedTransactionCard'
 export { VoiceInputButton } from './VoiceInputButton'

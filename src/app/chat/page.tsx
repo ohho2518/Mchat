@@ -1,22 +1,25 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
-import { ChatInput, ChatMessage, ParsedTransactionCard } from '@/components/chat'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ChatInput, ChatMessage, DateContextBar, ParsedTransactionCard } from '@/components/chat'
+import { TransactionForm } from '@/components/transactions'
 import { Spinner } from '@/components/ui'
-import type { ParsedTransaction } from '@/types/transaction'
+import type { ParsedTransaction, Transaction } from '@/types/transaction'
 import { format } from 'date-fns'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type MsgUser   = { id: string; role: 'user';   text: string }
 type MsgSystem = { id: string; role: 'system'; text: string; variant?: 'default' | 'success' | 'error' }
-type MsgParsed = { id: string; role: 'parsed'; parsed: ParsedTransaction; status: 'pending' | 'confirmed' | 'rejected' }
+type MsgParsed = {
+  id: string; role: 'parsed'
+  parsed: ParsedTransaction
+  status: 'pending' | 'confirmed' | 'rejected'
+  savedTransaction?: Transaction   // set after confirmed — used for edit
+}
 type MessageItem = MsgUser | MsgSystem | MsgParsed
 
 let seq = 0
-const uid = () => String(++seq)
-
-function todayStr() {
-  return format(new Date(), 'yyyy-MM-dd')
-}
+const uid     = () => String(++seq)
+const todayStr = () => format(new Date(), 'yyyy-MM-dd')
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function ChatPage() {
@@ -27,8 +30,10 @@ export default function ChatPage() {
       text: 'สวัสดีครับ 👋 พิมพ์รายรับรายจ่ายได้เลย เช่น\n"จ่ายค่าน้ำมัน 500 วันนี้" หรือ "ขายของ 850 เงินสด"',
     },
   ])
-  const [parsing,  setParsing]  = useState(false)
-  const [saving,   setSaving]   = useState<string | null>(null) // id ของ parsed msg ที่กำลัง save
+  const [parsing,     setParsing]     = useState(false)
+  const [saving,      setSaving]      = useState<string | null>(null)
+  const [contextDate, setContextDate] = useState(todayStr)
+  const [editTarget,  setEditTarget]  = useState<Transaction | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -73,14 +78,17 @@ export default function ChatPage() {
   const handleConfirm = async (msgId: string, parsed: ParsedTransaction) => {
     setSaving(msgId)
     try {
+      // Use contextDate when it's not today, OR when parser found no date
+      const useContext = contextDate !== todayStr() || !parsed.transactionDate
+      const transactionDate = useContext ? contextDate : (parsed.transactionDate ?? todayStr())
+
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type:            parsed.type,
           amount:          parsed.amount,
-          transactionDate: parsed.transactionDate ?? todayStr(),
-          categoryId:      undefined,
+          transactionDate,
           description:     parsed.description || parsed.rawText,
           rawText:         parsed.rawText,
           paymentMethod:   parsed.paymentMethod !== 'unknown' ? parsed.paymentMethod : undefined,
@@ -89,9 +97,14 @@ export default function ChatPage() {
 
       if (!res.ok) throw new Error('save error')
 
-      // อัปเดต card status → confirmed
+      const saved: Transaction = await res.json()
+
       setMessages((prev) =>
-        prev.map((m) => m.id === msgId ? { ...m, status: 'confirmed' } as MsgParsed : m)
+        prev.map((m) =>
+          m.id === msgId
+            ? { ...m, status: 'confirmed', savedTransaction: saved } as MsgParsed
+            : m
+        )
       )
       setMessages((prev) => [...prev, {
         id: uid(), role: 'system',
@@ -114,9 +127,35 @@ export default function ChatPage() {
     )
   }
 
+  // ─── Edit saved transaction ───────────────────────────────────────────────
+  const handleEditSave = useCallback(async (id: string, data: Partial<Transaction>) => {
+    const res = await fetch(`/api/transactions/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error('update error')
+    const updated: Transaction = await res.json()
+    // Reflect update in chat history
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.role === 'parsed' && m.savedTransaction?.id === id
+          ? { ...m, savedTransaction: updated } as MsgParsed
+          : m
+      )
+    )
+  }, [])
+
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col" style={{ height: 'calc(100dvh - 7.5rem)' }}>
+      {/* Date context bar */}
+      <DateContextBar
+        date={contextDate}
+        onChange={setContextDate}
+        onReset={() => setContextDate(todayStr())}
+      />
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto min-h-0 px-4 py-4 space-y-3">
         {messages.map((msg) => {
@@ -127,14 +166,17 @@ export default function ChatPage() {
             return <ChatMessage key={msg.id} role="system" text={msg.text} variant={msg.variant} />
           }
           // parsed card
+          const overrideDate = contextDate !== todayStr() ? contextDate : undefined
           return (
             <ParsedTransactionCard
               key={msg.id}
               parsed={msg.parsed}
               status={msg.status}
               loading={saving === msg.id}
+              overrideDate={overrideDate}
               onConfirm={() => handleConfirm(msg.id, msg.parsed)}
               onReject={() => handleReject(msg.id)}
+              onEdit={msg.savedTransaction ? () => setEditTarget(msg.savedTransaction!) : undefined}
             />
           )
         })}
@@ -154,6 +196,13 @@ export default function ChatPage() {
 
       {/* Input */}
       <ChatInput onSubmit={handleSubmit} disabled={parsing || !!saving} />
+
+      {/* Edit modal */}
+      <TransactionForm
+        transaction={editTarget}
+        onClose={() => setEditTarget(null)}
+        onSave={handleEditSave}
+      />
     </div>
   )
 }

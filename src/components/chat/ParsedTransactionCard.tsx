@@ -1,16 +1,18 @@
 'use client'
-import { AlertTriangle, CheckCircle2, X, Check } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, X, Check, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import type { ParsedTransaction } from '@/types/transaction'
 
 interface ParsedTransactionCardProps {
-  parsed: ParsedTransaction
-  onConfirm: () => void
-  onReject: () => void
-  loading?: boolean
-  status?: 'pending' | 'confirmed' | 'rejected'
+  parsed:        ParsedTransaction
+  onConfirm:     () => void
+  onReject:      () => void
+  loading?:      boolean
+  status?:       'pending' | 'confirmed' | 'rejected'
+  overrideDate?: string        // date context from DateContextBar (YYYY-MM-DD)
+  onEdit?:       () => void    // edit confirmed transaction
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -33,16 +35,20 @@ function formatTHB(amount: number | null) {
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return 'วันนี้'
-  const d = new Date(dateStr)
+  const d = new Date(dateStr + 'T00:00:00')
   return `${d.getDate()} ${THAI_MONTHS[d.getMonth()]} ${d.getFullYear()}`
 }
 
 export function ParsedTransactionCard({
-  parsed, onConfirm, onReject, loading, status = 'pending',
+  parsed, onConfirm, onReject, loading, status = 'pending', overrideDate, onEdit,
 }: ParsedTransactionCardProps) {
   const { type, amount, transactionDate, categoryName, paymentMethod, confidence, description } = parsed
   const lowConfidence = confidence < 0.6
-  const canConfirm = amount !== null && type !== 'unknown'
+  const canConfirm    = amount !== null && type !== 'unknown'
+
+  // effective date: overrideDate takes priority when explicitly set
+  const effectiveDate  = overrideDate ?? transactionDate
+  const dateOverridden = overrideDate && overrideDate !== transactionDate
 
   if (status === 'confirmed') {
     return (
@@ -50,6 +56,15 @@ export function ParsedTransactionCard({
         <div className="flex items-center gap-2 rounded-2xl rounded-bl-sm bg-green-50 border border-green-200 px-4 py-2.5 text-sm text-green-700">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           บันทึกรายการแล้ว
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="ml-1 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              <Pencil className="h-3 w-3" />
+              แก้ไข
+            </button>
+          )}
         </div>
       </div>
     )
@@ -79,17 +94,21 @@ export function ParsedTransactionCard({
           )}
         </div>
 
-        {/* Amount */}
+        {/* Amount + Date */}
         <div className="px-4 py-3">
           <p className={cn('text-3xl font-bold tracking-tight', TYPE_AMOUNT_COLOR[type])}>
             {formatTHB(amount)}
           </p>
           <p className="mt-1 text-xs text-gray-500">
-            {formatDate(transactionDate)}
-            {METHOD_LABELS[paymentMethod] && (
-              <> · {METHOD_LABELS[paymentMethod]}</>
-            )}
+            {formatDate(effectiveDate)}
+            {METHOD_LABELS[paymentMethod] && <> · {METHOD_LABELS[paymentMethod]}</>}
           </p>
+          {/* Show override indicator when date context overrides parser date */}
+          {dateOverridden && (
+            <p className="mt-0.5 text-xs text-blue-500">
+              📅 ใช้วันที่จาก context (parser ระบุ {formatDate(transactionDate)})
+            </p>
+          )}
         </div>
 
         {/* Low confidence warning */}
@@ -110,23 +129,13 @@ export function ParsedTransactionCard({
 
         {/* Actions */}
         <div className="flex gap-2 px-4 pb-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="flex-1"
-            onClick={onReject}
-            disabled={loading}
-          >
+          <Button variant="secondary" size="sm" className="flex-1" onClick={onReject} disabled={loading}>
             <X className="h-3.5 w-3.5" />
             ยกเลิก
           </Button>
           <Button
-            variant="primary"
-            size="sm"
-            className="flex-1"
-            onClick={onConfirm}
-            disabled={!canConfirm || loading}
-            loading={loading}
+            variant="primary" size="sm" className="flex-1"
+            onClick={onConfirm} disabled={!canConfirm || loading} loading={loading}
           >
             <Check className="h-3.5 w-3.5" />
             ยืนยัน
