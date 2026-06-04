@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Sarabun } from "next/font/google"
+import { Analytics } from "@vercel/analytics/react"
 import { AppShell } from "@/components/layout"
 import { Providers } from "@/components/Providers"
 import { PwaRegister } from "@/components/PwaRegister"
@@ -43,6 +44,7 @@ export default function RootLayout({
         <Providers>
           <AppShell>{children}</AppShell>
           <PwaRegister />
+          <Analytics />
         </Providers>
       </body>
     </html>

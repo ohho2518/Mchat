@@ -195,7 +195,13 @@ export default function ChatPage() {
       </div>
 
       {/* Input */}
-      <ChatInput onSubmit={handleSubmit} disabled={parsing || !!saving} />
+      <ChatInput
+        onSubmit={handleSubmit}
+        disabled={parsing || !!saving}
+        onError={(msg) => setMessages((prev) => [...prev, {
+          id: uid(), role: 'system', text: msg, variant: 'error',
+        }])}
+      />
 
       {/* Edit modal */}
       <TransactionForm

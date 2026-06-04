@@ -3,13 +3,15 @@ import { Send } from 'lucide-react'
 import { useRef, useState, KeyboardEvent, ChangeEvent } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { VoiceInputButton } from './VoiceInputButton'
+import { SlipUploadButton } from './SlipUploadButton'
 
 interface ChatInputProps {
-  onSubmit: (text: string) => void
+  onSubmit:  (text: string) => void
+  onError?:  (msg: string) => void
   disabled?: boolean
 }
 
-export function ChatInput({ onSubmit, disabled }: ChatInputProps) {
+export function ChatInput({ onSubmit, onError, disabled }: ChatInputProps) {
   const [text, setText] = useState('')
   const taRef = useRef<HTMLTextAreaElement>(null)
 
@@ -35,6 +37,12 @@ export function ChatInput({ onSubmit, disabled }: ChatInputProps) {
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`
   }
 
+  // OCR result: fill input + focus so user can review before sending
+  const handleOcrResult = (ocrText: string) => {
+    setText(ocrText)
+    setTimeout(() => taRef.current?.focus(), 50)
+  }
+
   return (
     <div className="flex items-end gap-2 bg-white border-t border-gray-200 px-3 py-2">
       <div className={cn(
@@ -51,6 +59,11 @@ export function ChatInput({ onSubmit, disabled }: ChatInputProps) {
           rows={1}
           placeholder='เช่น "จ่ายค่าน้ำมัน 500 วันนี้"'
           className="flex-1 resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-gray-400 min-h-[1.5rem]"
+        />
+        <SlipUploadButton
+          onResult={handleOcrResult}
+          onError={onError}
+          disabled={disabled}
         />
         <VoiceInputButton
           onResult={(t) => { setText(t); taRef.current?.focus() }}
