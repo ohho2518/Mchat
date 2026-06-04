@@ -21,10 +21,11 @@ setup('create test user and save auth state', async ({ page }) => {
   expect([201, 409]).toContain(res.status())
 
   // Login via UI to capture cookies/session
+  // Input has no `id` prop — use attribute selectors instead of getByLabel
   await page.goto('/login')
-  await page.getByLabel('อีเมล').fill(EMAIL)
-  await page.getByLabel('รหัสผ่าน').fill(PASSWORD)
-  await page.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
+  await page.locator('input[type="email"]').fill(EMAIL)
+  await page.locator('input[type="password"]').fill(PASSWORD)
+  await page.locator('button[type="submit"]').click()
 
   await page.waitForURL('**/chat', { timeout: 10_000 })
   await expect(page).toHaveURL(/\/chat/)
