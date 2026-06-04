@@ -39,12 +39,36 @@ const tests: Array<{
   { input: 'ลูกค้าค้างจ่าย 3500',             expectedType: 'debt',     expectedAmount: 3500 },
   { input: 'ซื้ออาหารไก่ 480',                expectedType: 'expense',  expectedAmount: 480 },
   { input: 'รับเงินสวน 9000',                  expectedType: 'income',   expectedAmount: 9000 },
-  // 5 edge cases
+  // 5 edge cases (original)
   { input: 'จ่าย ๕๐๐ วันนี้',                expectedType: 'expense',  expectedAmount: 500 },
   { input: 'ขาย 1,250.50 บาท',               expectedType: 'income',   expectedAmount: 1250.50 },
   { input: 'ค่าน้ำมัน',                       expectedType: 'expense',  expectedAmount: null },
   { input: '500',                              expectedType: 'unknown',  expectedAmount: 500 },
   { input: 'รับเงินยืม 3000',                 expectedType: 'debt',     expectedAmount: 3000 },
+
+  // ─── Date-before-amount bugs (fixed in amountParser) ─────────────────────
+  { input: 'วันที่ 5 ค่าไฟ 780',             expectedType: 'expense',  expectedAmount: 780,  expectedCategory: 'ค่าไฟ' },
+  { input: '30/06 จ่ายค่าน้ำมัน 500',        expectedType: 'expense',  expectedAmount: 500,  expectedCategory: 'ค่าน้ำมัน' },
+  { input: '1/1/2568 ขายของ 1500',           expectedType: 'income',   expectedAmount: 1500 },
+  { input: 'วันที่ 15 รับค่างาน 4500',        expectedType: 'income',   expectedAmount: 4500 },
+
+  // ─── Thai word numbers ────────────────────────────────────────────────────
+  { input: 'ซื้อสองพัน',                     expectedType: 'expense',  expectedAmount: 2000 },
+  { input: 'ยืมหนึ่งหมื่น',                  expectedType: 'debt',     expectedAmount: 10000 },
+  { input: 'ขายสามพัน',                      expectedType: 'income',   expectedAmount: 3000 },
+  { input: 'จ่าย 3พัน เงินสด',               expectedType: 'expense',  expectedAmount: 3000 },
+  { input: 'ค่าเช่าสองพัน',                  expectedType: 'expense',  expectedAmount: 2000,  expectedCategory: 'ค่าเช่า' },
+
+  // ─── k/K suffix ──────────────────────────────────────────────────────────
+  { input: 'ซื้อของ 2.5k เงินสด',            expectedType: 'expense',  expectedAmount: 2500 },
+  { input: 'จ่ายค่าน้ำมัน 1k',              expectedType: 'expense',  expectedAmount: 1000 },
+
+  // ─── New categories ──────────────────────────────────────────────────────
+  { input: 'ค่าโทรศัพท์ 599',                expectedType: 'expense',  expectedAmount: 599,  expectedCategory: 'ค่าโทรศัพท์' },
+  { input: 'จ่ายค่าเน็ต 600 เดือนนี้',       expectedType: 'expense',  expectedAmount: 600,  expectedCategory: 'ค่าโทรศัพท์' },
+  { input: 'จ่ายค่าเช่าบ้าน 5000',           expectedType: 'expense',  expectedAmount: 5000, expectedCategory: 'ค่าเช่า' },
+  { input: 'รับเงินเดือน 25000',              expectedType: 'income',   expectedAmount: 25000, expectedCategory: 'เงินเดือน' },
+  { input: 'ขายหมู 3000',                    expectedType: 'income',   expectedAmount: 3000, expectedCategory: 'ขายของ' },
 ]
 
 // ─── Runner ───────────────────────────────────────────────
