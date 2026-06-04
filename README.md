@@ -78,7 +78,7 @@ MChat/
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 14 + React + TypeScript + Tailwind CSS |
+| Frontend | Next.js 16 + React 19 + TypeScript + Tailwind CSS v4 |
 | Charts | Recharts |
 | Forms | React Hook Form + Zod |
 | Backend | Next.js API Routes |
