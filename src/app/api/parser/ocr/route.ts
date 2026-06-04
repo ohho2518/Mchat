@@ -63,7 +63,15 @@ export async function POST(req: Request) {
     })
 
     if (!response.ok) {
-      const err = await response.json()
+      const err = await response.json().catch(() => ({}))
+      const type = err?.error?.type ?? ''
+      // 400 from OpenAI = image unreadable/invalid format → 422 to client
+      // 4xx auth/quota errors or 5xx server errors → 500
+      const isImageError = response.status === 400 ||
+        type.includes('invalid') || type.includes('image')
+      if (isImageError) {
+        return NextResponse.json({ error: 'อ่านรูปไม่ได้ — ลองถ่ายรูปใหม่ให้ชัดขึ้น' }, { status: 422 })
+      }
       console.error('OpenAI error:', err)
       return NextResponse.json({ error: 'OCR ล้มเหลว กรุณาลองใหม่' }, { status: 500 })
     }
