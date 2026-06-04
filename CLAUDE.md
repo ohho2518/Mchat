@@ -147,7 +147,7 @@ npm run lint
 DATABASE_URL="postgresql://..."       # Supabase pooler URL — ใช้สำหรับ runtime queries
 DIRECT_URL="postgresql://..."         # Supabase direct URL — ใช้สำหรับ prisma migrate เท่านั้น
 NEXTAUTH_SECRET="..."                 # generate: openssl rand -base64 32
-NEXTAUTH_URL="http://localhost:3000"  # production: https://mchat.vercel.app (ตั้งใน Vercel env vars)
+NEXTAUTH_URL="http://localhost:3000"  # production: https://mchat-git-main-vinit-deekhanu-s-projects.vercel.app
 ```
 
 > ทั้ง `DATABASE_URL` และ `DIRECT_URL` จำเป็นต้องมีทั้งคู่ — ดู URL แต่ละแบบได้ที่ Supabase Dashboard → Settings → Database → Connection string

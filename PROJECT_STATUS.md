@@ -105,5 +105,5 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 
 1. ต้องการให้เพิ่ม Account management UI ไหม? (เลือกบัญชีตอนบันทึก transaction)
 2. ต้องการหน้าติดตาม Debt (ลูกหนี้/เจ้าหนี้) แยกต่างหากไหม?
-3. ✅ Production domain ยืนยันแล้ว: `https://mchat.vercel.app` — ตั้ง `NEXTAUTH_URL` นี้ใน Vercel Dashboard → Settings → Environment Variables
+3. ✅ Production domain ยืนยันแล้ว: `https://mchat-git-main-vinit-deekhanu-s-projects.vercel.app` — ตั้ง `NEXTAUTH_URL` นี้ใน Vercel env vars
 4. ต้องการ analytics หรือ crash monitoring ไหม? (Sentry, Vercel Analytics ฯลฯ)
