@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { LogOut, Pencil, X, Check, Info, Download } from 'lucide-react'
+import { LogOut, Pencil, X, Check, Info, Download, Wallet, Tag, ChevronRight } from 'lucide-react'
+import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -220,6 +221,23 @@ export default function SettingsPage() {
             <p className="text-sm text-gray-400">••••••••</p>
           )}
           {passSuccess && <p className="text-xs text-green-600">✓ เปลี่ยนรหัสผ่านเรียบร้อย</p>}
+        </div>
+      </Card>
+
+      {/* จัดการข้อมูล */}
+      <Card>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">จัดการข้อมูล</p>
+        <div className="divide-y divide-gray-100">
+          <Link href="/accounts" className="flex items-center gap-3 py-2.5 text-sm text-gray-700 hover:text-blue-600 transition-colors">
+            <Wallet className="h-4 w-4 text-gray-400" />
+            <span className="flex-1">บัญชีของฉัน</span>
+            <ChevronRight className="h-4 w-4 text-gray-300" />
+          </Link>
+          <Link href="/categories" className="flex items-center gap-3 py-2.5 text-sm text-gray-700 hover:text-blue-600 transition-colors">
+            <Tag className="h-4 w-4 text-gray-400" />
+            <span className="flex-1">หมวดหมู่</span>
+            <ChevronRight className="h-4 w-4 text-gray-300" />
+          </Link>
         </div>
       </Card>
 
