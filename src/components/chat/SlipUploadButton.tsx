@@ -76,7 +76,6 @@ export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButt
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0]
@@ -94,7 +93,7 @@ export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButt
             : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600',
           'disabled:opacity-50 disabled:cursor-not-allowed'
         )}
-        title="ถ่ายรูปสลิป / บิล / ใบเสร็จ"
+        title="เลือกรูปสลิป / บิล / ใบเสร็จ (รายรับ หรือ รายจ่าย)"
       >
         {loading
           ? <Loader2 className="h-4 w-4 animate-spin" />
