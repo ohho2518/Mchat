@@ -51,7 +51,7 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 1. **QA ใน Production** — ทดสอบ golden path บน mobile browser จริง (Android Chrome, iOS Safari)
 2. **Debt Tracking UI** — schema มี `Debt` model แต่ยังไม่มีหน้าติดตามลูกหนี้/เจ้าหนี้
 3. ~~**Parser improvement**~~ ✅ เสร็จ — แก้ bugs date-before-amount, Thai word numbers (พัน/หมื่น/แสน/ล้าน), เพิ่ม categories (ค่าโทรศัพท์, ค่าเช่า, เงินเดือน), 41/41 tests pass
-4. **E2E tests** — `tests/e2e/` ยังว่างอยู่ ยังไม่มี automated E2E
+4. ~~**E2E tests**~~ ✅ เสร็จ — Playwright setup พร้อม global-setup, auth.spec, chat.spec, navigation.spec (19 tests)
 
 ---
 

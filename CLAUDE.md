@@ -118,14 +118,24 @@ npm run start    # start production server
 ## How to Test
 
 ```bash
-# Parser unit tests (25 test cases) — ไม่มี Jest ใช้ tsx โดยตรง
-npx tsx tests/parser/parseTransactionText.test.ts
+# Parser unit tests (41 test cases)
+npm run test:parser
+
+# E2E tests (Playwright) — ต้องมี dev server รันอยู่ หรือ playwright จะรันให้อัตโนมัติ
+npm run test:e2e           # headless
+npm run test:e2e:ui        # Playwright UI mode
+npm run test:e2e:debug     # debug mode with browser
 
 # Lint
 npm run lint
 ```
 
-> ไม่มี test framework (Jest/Vitest) ติดตั้ง — parser tests รันด้วย `npx tsx` เท่านั้น
+### E2E test setup
+- ต้องมี `.env.local` พร้อม `DATABASE_URL` และ `NEXTAUTH_SECRET`
+- Playwright รัน `npm run dev` อัตโนมัติก่อน test
+- global-setup.ts สร้าง test user (`e2e-test@mchat.test`) อัตโนมัติ
+- Override credentials ด้วย env vars: `TEST_EMAIL`, `TEST_PASSWORD`
+- Auth state เก็บใน `tests/e2e/.auth/user.json` (gitignored)
 
 ---
 

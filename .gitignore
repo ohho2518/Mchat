@@ -35,3 +35,8 @@ public/workbox-*.js.map
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright
+/test-results/
+/playwright-report/
+tests/e2e/.auth/
