@@ -4,6 +4,31 @@
 
 ---
 
+## 2026-06-04
+
+### Documentation
+- Added CLAUDE.md (rewrite) — AI working rules, common tasks, correct Next.js version (16), full API list, env vars
+- Added PROJECT_STATUS.md — current state, next tasks, known issues, decisions
+- Added CHANGELOG.md
+- Fixed .env.example — added missing DIRECT_URL (required by Prisma schema), clarified production NEXTAUTH_URL
+- Fixed README.md — corrected Next.js version 14 → 16
+
+### Features
+- Added Account Management UI — `/accounts` page, CRUD API, AccountCard + AccountForm, link from Settings
+- Added Debt Tracking UI — `/debts` page (3 tabs, summary cards), DebtCard + DebtForm + PaymentModal, partial/full payment, CRUD API
+
+### Parser
+- Fixed: date number before amount (e.g. "วันที่ 5 ค่าไฟ 780" → amount=5 bug)
+- Fixed: DD/MM date format without year extracted as amount
+- Added: Thai word numbers (สองพัน→2000, หนึ่งหมื่น→10000, 3พัน→3000)
+- Added: categories — ค่าโทรศัพท์, ค่าเช่า, เงินเดือน + expanded keywords
+- Tests: 25 → 41 cases (41/41 pass)
+
+### Testing
+- Added Playwright E2E suite — 19 tests (auth, chat, navigation); global-setup auto-creates test user
+
+---
+
 ## 2026-06-01
 
 ### Voice Input
