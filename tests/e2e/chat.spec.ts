@@ -20,7 +20,7 @@ test.describe('Chat page', () => {
 
     // Card should appear with parsed amount
     await expect(page.getByText('฿500')).toBeVisible({ timeout: 8_000 })
-    await expect(page.getByText('รายจ่าย')).toBeVisible()
+    await expect(page.getByText('รายจ่าย', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: 'ยืนยัน' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'ยกเลิก' })).toBeVisible()
   })
@@ -67,7 +67,7 @@ test.describe('Chat page', () => {
     await page.getByPlaceholder(/จ่ายค่าน้ำมัน/).press('Enter')
 
     await expect(page.getByText('฿850')).toBeVisible({ timeout: 8_000 })
-    await expect(page.getByText('รายรับ')).toBeVisible()
+    await expect(page.getByText('รายรับ', { exact: true })).toBeVisible()
   })
 
   test('can enter multiple transactions in sequence', async ({ page }) => {

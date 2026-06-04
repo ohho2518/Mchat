@@ -47,7 +47,8 @@ test.describe('Page routing', () => {
     await page.goto('/debts')
     await expect(page).toHaveURL(/\/debts/)
     await expect(
-      page.getByText('เราเป็นหนี้').or(page.getByText('ไม่มีรายการค้างอยู่'))
+      page.getByRole('button', { name: 'เราเป็นหนี้', exact: true })
+        .or(page.getByText('ไม่มีรายการค้างอยู่'))
     ).toBeVisible({ timeout: 5_000 })
   })
 
