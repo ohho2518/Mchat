@@ -1,253 +1,266 @@
-# MChat — Claude Code Handoff
+# CLAUDE.md
 
-> อ่านไฟล์นี้ก่อนเริ่มทำงานทุกครั้ง
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ---
 
-## โปรเจกต์คืออะไร
+## Project Overview
 
-**MChat** คือ Web App บันทึกรายรับรายจ่ายแบบแชท  
-ผู้ใช้พิมพ์ภาษาไทยธรรมดา เช่น `"จ่ายค่าน้ำมัน 500 วันนี้"` แล้วระบบแยกหมวด สรุปยอด และทำ Dashboard ให้ทันที
-
+**MChat** คือ Web App (PWA) บันทึกรายรับรายจ่ายแบบแชทภาษาไทย  
+ผู้ใช้พิมพ์ข้อความธรรมดา เช่น `"จ่ายค่าน้ำมัน 500 วันนี้"` ระบบจะแยกหมวด สรุปยอด และแสดงใน Dashboard อัตโนมัติ  
 **กลุ่มผู้ใช้:** เจ้าของร้านเล็ก, เกษตรกร, ฟรีแลนซ์, บุคคลทั่วไป
 
 ---
 
 ## Tech Stack
 
-```
-Frontend:  Next.js 14 (App Router) + TypeScript + Tailwind CSS
-Charts:    Recharts
-Forms:     React Hook Form + Zod
-Backend:   Next.js API Routes
-Database:  Supabase PostgreSQL + Prisma ORM
-Auth:      NextAuth.js (email/password)
-Voice:     Web Speech API (built-in browser, lang=th-TH)
-Export:    ExcelJS + papaparse
-Deploy:    Vercel + Supabase Cloud
-```
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 16.2.6 (App Router) + React 19 + TypeScript 5 |
+| Styling | Tailwind CSS v4 + tailwind-merge + clsx |
+| Charts | Recharts v3 |
+| Forms | React Hook Form v7 + Zod v4 + @hookform/resolvers |
+| Icons | lucide-react |
+| Auth | NextAuth.js v4 (JWT strategy, credentials only) |
+| Database | Supabase PostgreSQL + Prisma ORM v6 |
+| Voice | Web Speech API built-in (lang=th-TH) |
+| Export | xlsx + papaparse |
+| PWA | public/manifest.json + public/sw.js + src/app/PwaRegister.tsx |
+| Package manager | npm |
+| Deploy | Vercel + Supabase Cloud |
 
 ---
 
-## โครงสร้างโฟลเดอร์
+## Project Structure
 
 ```
 src/
   app/
-    chat/page.tsx               ← หน้าหลัก (บันทึกด้วยแชท)
+    layout.tsx              ← root layout (Sarabun font, Providers, PwaRegister)
+    page.tsx                ← redirect to /chat
+    login/page.tsx
+    chat/page.tsx           ← หน้าหลัก: parse → confirm → save flow
     dashboard/page.tsx
     transactions/page.tsx
     categories/page.tsx
-    settings/page.tsx
+    settings/page.tsx       ← profile edit, password change, PWA install
     api/
-      parser/parse/route.ts     ← POST: แปลง text → transaction
-      transactions/route.ts     ← GET, POST
-      transactions/[id]/route.ts← PUT, DELETE
-      categories/route.ts
-      dashboard/summary/route.ts
-      dashboard/daily-cashflow/route.ts
-      dashboard/category-expense/route.ts
+      auth/[...nextauth]/   ← NextAuth handler
+      auth/register/        ← POST สร้าง account ใหม่
+      user/                 ← PATCH update profile/password
+      parser/parse/         ← POST text → ParsedTransaction (ไม่ write DB)
+      transactions/         ← GET list, POST create
+      transactions/[id]/    ← PUT update, DELETE soft-delete
+      categories/           ← GET, POST
+      categories/[id]/      ← PUT, DELETE
+      dashboard/summary/    ← GET summary (today + month)
+      dashboard/daily-cashflow/
+      dashboard/category-expense/
 
   components/
-    layout/  AppShell, Header, BottomNav
-    chat/    ChatInput, ChatMessage, ParsedTransactionCard, VoiceInputButton
-    dashboard/ SummaryCard, IncomeExpenseChart, CategoryPieChart, CashflowLineChart
+    layout/    AppShell, Header, BottomNav
+    chat/      ChatInput, ChatMessage, ParsedTransactionCard, VoiceInputButton
+    dashboard/ SummaryCard, PeriodSelector, IncomeExpenseChart, CashflowLineChart, CategoryPieChart
     transactions/ TransactionTable, TransactionFilter, TransactionForm
     categories/  CategoryList, CategoryForm
-    ui/      Button, Card, Input, Badge, Modal, Spinner, EmptyState, ConfirmDialog
+    ui/        Button, Card, Input, Badge, Modal, Spinner, EmptyState, ConfirmDialog
 
   lib/
+    auth.ts                 ← NextAuth config
     parser/
-      parseTransactionText.ts   ← main function (entry point)
-      normalize.ts
-      amountParser.ts
-      dateParser.ts
-      typeDetector.ts
-      categoryDetector.ts
-      paymentMethodDetector.ts
-    db/prisma.ts
-    export/exportExcel.ts
-    export/exportCsv.ts
+      parseTransactionText.ts  ← entry point
+      normalize.ts, amountParser.ts, dateParser.ts
+      typeDetector.ts, categoryDetector.ts, paymentMethodDetector.ts
+    db/prisma.ts            ← Prisma singleton
+    export/exportExcel.ts, exportCsv.ts
+    utils/cn.ts, password.ts
+    validators/transaction.ts, category.ts  ← Zod schemas (shared API+client)
 
-  types/
-    transaction.ts
-    dashboard.ts
+  types/transaction.ts, dashboard.ts
+  data/seedCategories.ts
 
-  data/
-    seedCategories.ts           ← seed data พร้อมใช้
-
-prisma/schema.prisma            ← DB schema ครบแล้ว
-tests/
-  parser/                       ← unit tests
-  api/                          ← integration tests
-  e2e/
-docs/
-  plan/DEV_PLAN.md              ← แผนพัฒนาครบวงจร
-  plan/PARSER_GUIDE.md
-  api/API_REFERENCE.md
-  db/SCHEMA.md
-  design/DESIGN_SYSTEM.md
+middleware.ts               ← withAuth: ป้องกันทุก route ยกเว้น /login, /api/auth
+prisma/schema.prisma, seed.ts, migrations/
+public/manifest.json, sw.js, icons/
+tests/parser/parseTransactionText.test.ts
 ```
 
 ---
 
-## Development Phases — สถานะปัจจุบัน
-
-| Phase | งาน | สถานะ |
-|---|---|---|
-| **Phase 0** | Environment Setup + Schema + Seed | ✅ เสร็จ |
-| **Phase 1** | Layout + UI Components | ✅ เสร็จ |
-| **Phase 2** | Database + API Layer | ✅ เสร็จ |
-| **Phase 3** | Thai Parser (Rule-based) | ✅ เสร็จ |
-| **Phase 4** | Chat UI + Voice Input | ✅ เสร็จ |
-| **Phase 5** | Dashboard | ✅ เสร็จ |
-| **Phase 6** | Transactions + Export | ✅ เสร็จ |
-| **Phase 7** | Category + Settings | ✅ เสร็จ |
-
-> อัปเดต status เป็น 🔄 กำลังทำ / ✅ เสร็จ เมื่อเริ่มและจบแต่ละ phase
-
----
-
-## เริ่มต้นใช้งาน (ถ้า Next.js ยังไม่ได้ init)
+## How to Run
 
 ```bash
-# 1. init Next.js project ใน folder นี้
-npx create-next-app@latest . --typescript --tailwind --app --src-dir
+npm install
 
-# 2. ติดตั้ง dependencies
-npm install @prisma/client prisma next-auth @auth/prisma-adapter
-npm install recharts date-fns react-hook-form zod
-npm install xlsx papaparse @types/papaparse
-npm install lucide-react clsx tailwind-merge
-
-# 3. ตั้งค่า .env.local
+# ตั้งค่า environment
 cp .env.example .env.local
-# แก้ไข DATABASE_URL และ NEXTAUTH_SECRET
+# แก้ DATABASE_URL, DIRECT_URL, NEXTAUTH_SECRET
 
-# 4. DB setup
-npx prisma migrate dev --name init
+# Setup database
+npx prisma migrate dev
 npx prisma db seed
 
-# 5. รัน dev
 npm run dev
+# → http://localhost:3000
 ```
 
 ---
 
-## กฎการทำงาน
+## How to Build
 
-### การเขียน Code
-- ใช้ TypeScript strict เสมอ
-- ทุก async API route ต้องมี try/catch + return error JSON
-- Validation ด้วย Zod ทุก API endpoint
-- ใช้ Prisma เท่านั้น ห้าม raw SQL
-- Component ต้องมี loading + error + empty state
+```bash
+npm run build    # prisma generate && next build
+npm run start    # start production server
+```
 
-### Parser (สำคัญมาก)
-- Parser อยู่ใน `src/lib/parser/` ห้ามใส่ logic ใน API route
-- ลำดับ type detection: `transfer > debt > expense > income`
-- ถ้า confidence < 0.6 ต้องแสดง warning ให้ผู้ใช้ยืนยัน
-- `transfer` ต้องไม่นับเป็น income หรือ expense ในรายงาน
-- เก็บ `rawText` ทุกครั้งเพื่อ debug
+---
+
+## How to Test
+
+```bash
+# Parser unit tests (25 test cases) — ไม่มี Jest ใช้ tsx โดยตรง
+npx tsx tests/parser/parseTransactionText.test.ts
+
+# Lint
+npm run lint
+```
+
+> ไม่มี test framework (Jest/Vitest) ติดตั้ง — parser tests รันด้วย `npx tsx` เท่านั้น
+
+---
+
+## Environment Variables
+
+จาก `.env.example`:
+
+```env
+DATABASE_URL="postgresql://..."       # Supabase pooler URL — ใช้สำหรับ runtime queries
+DIRECT_URL="postgresql://..."         # Supabase direct URL — ใช้สำหรับ prisma migrate เท่านั้น
+NEXTAUTH_SECRET="..."                 # generate: openssl rand -base64 32
+NEXTAUTH_URL="http://localhost:3000"  # production: https://mchat.vercel.app (ตั้งใน Vercel env vars)
+```
+
+> ทั้ง `DATABASE_URL` และ `DIRECT_URL` จำเป็นต้องมีทั้งคู่ — ดู URL แต่ละแบบได้ที่ Supabase Dashboard → Settings → Database → Connection string
+
+---
+
+## Architecture Notes
+
+### Chat Flow (หน้าหลัก)
+```
+User types text
+  → POST /api/parser/parse  (rule-based, no DB write)
+  → ParsedTransactionCard แสดงผล + confidence score
+  → ถ้า confidence < 0.6 → warning สีแดง "กรุณาตรวจสอบก่อนบันทึก"
+  → User กด ยืนยัน → POST /api/transactions
+  → User กด ยกเลิก → ไม่บันทึก
+```
+
+### Auth Flow
+- `middleware.ts` ใช้ `withAuth` จาก NextAuth — redirect ทุก route ไป `/login` ยกเว้น `/login`, `/api/auth/**`
+- JWT token เก็บ `userId` ผ่าน `callbacks.jwt` → `callbacks.session` → `session.user.id`
+- ทุก API route: `getServerSession(authOptions)` → 401 ถ้าไม่มี session
+
+### Parser Pipeline
+```
+input → normalize → extractAmount → extractDate → detectType → detectCategory → detectPaymentMethod → calculateConfidence
+```
+Type detection priority (fixed): **transfer > debt > expense > income**
+
+### Dashboard
+- `GET /api/dashboard/summary` คืน today + month totals (exclude transfer/debt)
+- `GET /api/dashboard/daily-cashflow?days=N` คืน array วันต่อวัน
+- `GET /api/dashboard/category-expense?period=...` คืน breakdown ตามหมวดหมู่
+- Dashboard page group daily → monthly เมื่อ period = "year"
 
 ### Database
-- Soft delete เท่านั้น (status = 'deleted') ห้าม hard delete transaction
-- ทุก query ต้อง filter `status != 'deleted'`
-- Transfer ไม่นับใน dashboard sum
+- Soft delete เท่านั้น: `status = 'deleted'` (ห้าม hard delete Transaction)
+- ทุก query filter: `status: { not: 'deleted' }`
+- Transfer/Debt type ไม่นับใน dashboard sum (filter `type: { in: ['income','expense'] }`)
+- Schema มี model: `User`, `Account`, `Category`, `CategoryKeyword`, `Transaction`, `Transfer`, `Debt`
+- `Account`, `Transfer`, `Debt` model มีใน schema แต่ยังไม่มี CRUD API/UI รองรับ
 
-### UI/UX
-- Mobile-first เสมอ (test ที่ 375px ก่อน)
-- สีรายรับ: green-600 (#16A34A)
-- สีรายจ่าย: red-600 (#DC2626)
-- สีคงเหลือ: blue-600 (#2563EB)
-- Font: Sarabun (Google Fonts)
-- Bottom navigation 4 เมนู: บันทึก / รายงาน / รายการ / ตั้งค่า
+---
+
+## Coding Rules
+
+### API Routes
+- ทุก async route: `try/catch` + return `{ error: string }` JSON
+- Validate ด้วย Zod `.safeParse()` ก่อนแตะ DB เสมอ
+- ใช้ Prisma เท่านั้น ห้าม raw SQL
+- เช็ค session ก่อนทุก operation
+
+### Parser (`src/lib/parser/`)
+- Logic ทั้งหมดอยู่ใน `src/lib/parser/` ห้ามใส่ใน API route
+- Type detection priority คงที่: `transfer > debt > expense > income`
+- เก็บ `rawText` ทุก Transaction สำหรับ debug
+
+### Components
+- ทุก component ต้องมี loading + error + empty state
+- Mobile-first (design ที่ 375px ก่อน)
+- สีมาตรฐาน: income `green-600`, expense `red-600`, balance `blue-600`
+- Font: Sarabun (โหลดจาก Google Fonts ใน layout.tsx)
 
 ### Voice Input
-- ใช้ Web Speech API (`lang='th-TH'`)
-- ตรวจสอบ `'SpeechRecognition' in window` ก่อนแสดงปุ่ม
+- เช็ค `'SpeechRecognition' in window` ก่อนแสดงปุ่ม
 - Firefox ไม่รองรับ → ซ่อนปุ่มอัตโนมัติ
-- ต้อง HTTPS (Vercel จัดการให้อยู่แล้ว)
+- ต้อง HTTPS ใน production
+
+### TypeScript
+- strict mode เสมอ
+- Validators ใน `src/lib/validators/` ใช้ทั้ง API route และ React Hook Form (ไม่เขียน Zod schema ซ้ำ)
 
 ---
 
-## Business Rules ที่ต้องรู้
+## AI Working Rules
 
-1. **ฟรีถ้าจอดไม่เกิน FreeTime** — ไม่ใช่ระบบจอดรถ อันนี้คือบัญชี
-2. **Transfer ≠ รายรับ/รายจ่าย** — โอนเงินระหว่างบัญชีไม่นับกำไร/ขาดทุน
-3. **"รับเงินยืม"** → type = `debt` ไม่ใช่ `income`
-4. **หน้ายืนยันก่อนบันทึกเสมอ** — ผู้ใช้ต้องกด confirm ทุกครั้ง
-5. **Confidence < 0.6** → แสดง warning สีแดง "กรุณาตรวจสอบก่อนบันทึก"
-6. **BillID** — ไม่มีใน MChat (นั่นคือระบบจอดรถ BC20)
-
----
-
-## Test Cases Parser (20 กรณีหลัก)
-
-ดูรายละเอียดที่ `tests/parser/TEST_CASES.md`
-
-```
-"จ่ายค่าน้ำมัน 500 วันนี้"       → expense, 500, ค่าน้ำมัน
-"ขายของ 850 เงินสด"               → income, 850, ขายของ
-"โอนจากบัญชีร้านไปบัญชีสวน 3000" → transfer, 3000
-"ยืมเงินแม่ 5000"                  → debt, 5000
-"คืนเงินพี่ 2000"                  → debt, 2000
-```
+1. อ่าน `CLAUDE.md` และ `PROJECT_STATUS.md` ก่อนเริ่มงานทุกครั้ง
+2. ห้าม scan ทั้งโปรเจกต์ถ้าไม่จำเป็น — อ่านเฉพาะไฟล์ที่เกี่ยวกับ task ปัจจุบัน
+3. แก้เฉพาะส่วนที่เกี่ยวข้อง ห้าม rewrite ทั้งไฟล์ถ้าไม่จำเป็น
+4. รักษา behavior เดิมของระบบ ห้ามเปลี่ยน business logic นอกเหนือ task
+5. ถ้าไม่แน่ใจ ให้ระบุ assumption ให้ชัดเจนก่อนทำ
+6. หลังทำงานเสร็จ ต้องอัปเดต `PROJECT_STATUS.md`
+7. ถ้ามีการเปลี่ยน architecture, folder structure, command, DB schema หรือ coding rule → อัปเดต `CLAUDE.md`
+8. ถ้ามีการเปลี่ยน feature หรือ user-facing behavior → อัปเดต `CHANGELOG.md`
 
 ---
 
-## API ที่ต้องสร้าง
+## Common Tasks
 
-```
-POST /api/parser/parse          ← แปลง text → ParsedTransaction
-GET  /api/transactions          ← list with filter
-POST /api/transactions          ← create
-PUT  /api/transactions/:id      ← update
-DEL  /api/transactions/:id      ← soft delete
-GET  /api/categories
-POST /api/categories
-PUT  /api/categories/:id
-DEL  /api/categories/:id
-GET  /api/dashboard/summary?period=today|week|month|year
-GET  /api/dashboard/daily-cashflow
-GET  /api/dashboard/category-expense
-```
+| งาน | ไฟล์ที่เกี่ยวข้อง |
+|---|---|
+| เพิ่มหน้าใหม่ | `src/app/<page>/page.tsx` + เพิ่ม BottomNav ถ้าจำเป็น |
+| เพิ่ม component | `src/components/<group>/ComponentName.tsx` + อัปเดต `index.ts` |
+| เพิ่ม API endpoint | `src/app/api/<group>/route.ts` + validator ใน `src/lib/validators/` |
+| เพิ่ม DB field | `prisma/schema.prisma` → `npx prisma migrate dev` → อัปเดต types |
+| เพิ่ม parser keyword | `src/data/seedCategories.ts` (keywords array) → re-seed |
+| แก้ parser logic | `src/lib/parser/*.ts` → รัน test ด้วย `npx tsx tests/parser/...` |
+| แก้ dashboard chart | `src/components/dashboard/` + `src/app/api/dashboard/*/route.ts` |
+| Export ข้อมูล | `src/lib/export/exportExcel.ts` หรือ `exportCsv.ts` |
 
 ---
 
-## MVP Acceptance Criteria (10 ข้อ)
+## Do Not Do
 
-- [ ] พิมพ์ข้อความรายรับรายจ่ายภาษาไทยได้
-- [ ] Parser แปลง text → transaction ถูกต้อง >= 80% จาก 20 test cases
-- [ ] กดยืนยันก่อนบันทึกได้เสมอ
-- [ ] รายการบันทึกใน database จริง
-- [ ] Dashboard แสดงยอดรายวัน + รายเดือน + 3 กราฟ
-- [ ] ดูรายการย้อนหลัง + filter ได้
-- [ ] Export Excel ได้
-- [ ] เพิ่ม/แก้ไขหมวดหมู่ + keyword ได้
-- [ ] Voice input บน Chrome/Safari/Edge ทำงานได้
-- [ ] ใช้งานบน mobile ได้ (no horizontal scroll)
+- ห้ามใส่ API key, password, token หรือ secret จริงลงในโค้ดหรือเอกสาร
+- ห้ามลบไฟล์สำคัญโดยไม่ได้รับคำสั่ง
+- ห้ามเปลี่ยน type detection priority ใน parser (transfer > debt > expense > income)
+- ห้าม hard delete Transaction (ใช้ soft delete เสมอ)
+- ห้ามเปลี่ยน dependency หลักโดยไม่แจ้งเหตุผล
+- ห้าม format ทั้งโปรเจกต์ถ้า task ไม่ได้ขอ
+- ห้ามนำ business logic ของโปรเจกต์อื่น (dPRO / BC_Upgrade) มาใช้
 
 ---
 
-## เอกสารอ้างอิง
+## Reference Docs
 
 | เอกสาร | ตำแหน่ง |
 |---|---|
-| แผนพัฒนาครบวงจร | `docs/plan/DEV_PLAN.md` |
-| Handoff ต้นฉบับ | `docs/plan/HANDOFF.md` |
+| แผนพัฒนา | `docs/plan/DEV_PLAN.md` |
 | Parser Logic | `docs/plan/PARSER_GUIDE.md` |
 | API Reference | `docs/api/API_REFERENCE.md` |
 | DB Schema | `docs/db/SCHEMA.md` |
 | Design System | `docs/design/DESIGN_SYSTEM.md` |
-| Parser Tests | `tests/parser/TEST_CASES.md` |
+| Parser Test Cases | `tests/parser/TEST_CASES.md` |
 
----
-
-## หมายเหตุ
-
-- โปรเจกต์นี้แยกจาก `D:\Code\2026\BC_Upgrade` (ระบบจอดรถ dPRO) ไม่เกี่ยวกัน
-- ถ้าเจอ Business Logic เก่าจาก dPRO (เช่น RFID, Gate, Stamp) ข้ามไปได้เลย ไม่ใช้
-- เริ่มจาก Phase 0 → Phase 1 ตามลำดับ อย่าข้าม phase
-
-*MChat | พฤษภาคม 2569*
+*MChat | มิถุนายน 2569*
