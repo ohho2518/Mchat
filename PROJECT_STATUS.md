@@ -34,6 +34,7 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 - [x] User avatar/name in chat header
 - [x] PWA (manifest.json, service worker, icons, install button in Settings)
 - [x] Vercel deploy (build script: `prisma generate && next build`)
+- [x] Account Management UI (CRUD: /accounts, API /api/accounts, AccountCard, AccountForm)
 
 ---
 
@@ -48,12 +49,9 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 เรียงตามลำดับความสำคัญ:
 
 1. **QA ใน Production** — ทดสอบ golden path บน mobile browser จริง (Android Chrome, iOS Safari)
-2. **DIRECT_URL ใน .env.example** — เพิ่ม `DIRECT_URL` เพื่อรองรับ `prisma migrate dev` บน Supabase (ดู Known Issues)
-3. **Account Management UI** — schema มี `Account` model แต่ยังไม่มีหน้าจัดการ/CRUD API
-4. **Debt Tracking UI** — schema มี `Debt` model แต่ยังไม่มีหน้าติดตามลูกหนี้/เจ้าหนี้
-5. **Parser improvement** — เพิ่ม test cases สำหรับ edge case เช่น ตัวเลขภาษาไทยผสม
-6. **README update** — README.md ยังระบุ Next.js 14 (จริงคือ v16)
-7. **E2E tests** — `tests/e2e/` ยังว่างอยู่ ยังไม่มี automated E2E
+2. **Debt Tracking UI** — schema มี `Debt` model แต่ยังไม่มีหน้าติดตามลูกหนี้/เจ้าหนี้
+3. **Parser improvement** — เพิ่ม test cases สำหรับ edge case เช่น ตัวเลขภาษาไทยผสม
+4. **E2E tests** — `tests/e2e/` ยังว่างอยู่ ยังไม่มี automated E2E
 
 ---
 

@@ -10,6 +10,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/transactions': 'รายการ',
   '/categories': 'หมวดหมู่',
   '/accounts': 'บัญชีของฉัน',
+  '/debts':    'หนี้สิน',
   '/settings': 'ตั้งค่า',
 }
 
