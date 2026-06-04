@@ -5,7 +5,7 @@ import type { TransactionType } from '@/types/transaction'
 // ฝาก/ถอน = bank operations → always transfer (checked first, no exclusion)
 const BANK_OPS_KWS = ['ถอนเงิน', 'ถอน', 'ฝากเงิน', 'ฝากเข้า', 'ฝากธนาคาร', 'ฝาก']
 
-const TRANSFER_KWS = ['โอนจาก', 'โอนไป', 'ย้ายเงิน', 'โอนระหว่าง', 'โอนเงินออก']
+const TRANSFER_KWS = ['โอนจาก', 'โอนไป', 'ย้ายเงิน', 'โอนระหว่าง', 'โอนเงินออก', 'โอนเงิน', 'เติมเงินพร้อมเพย์', 'เติมพร้อมเพย์']
 // คำเหล่านี้มี "โอน" แต่เป็น income (ลูกค้าโอนเข้า)
 const TRANSFER_INCOME_KWS = ['รับโอน', 'โอนเข้า', 'ลูกค้าโอน', 'เงินเข้า']
 

@@ -69,6 +69,11 @@ const tests: Array<{
   { input: 'จ่ายค่าเช่าบ้าน 5000',           expectedType: 'expense',  expectedAmount: 5000, expectedCategory: 'ค่าเช่า' },
   { input: 'รับเงินเดือน 25000',              expectedType: 'income',   expectedAmount: 25000, expectedCategory: 'เงินเดือน' },
   { input: 'ขายหมู 3000',                    expectedType: 'income',   expectedAmount: 3000, expectedCategory: 'ขายของ' },
+
+  // ─── OCR slip patterns (Bangkok Bank / PromptPay) ─────────────────────────
+  { input: 'โอนเงิน เติมพร้อมเพย์ 150 บาท 02/06/2569',    expectedType: 'transfer', expectedAmount: 150 },
+  { input: 'โอนเงิน ค่าสินค้า 1500 บาท 04/06/2568',        expectedType: 'transfer', expectedAmount: 1500 },
+  { input: 'โอนเงิน ค่าสินค้า 1500 บาท วันนี้',            expectedType: 'transfer', expectedAmount: 1500 },
 ]
 
 // ─── Runner ───────────────────────────────────────────────
