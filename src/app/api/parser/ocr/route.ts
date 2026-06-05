@@ -72,9 +72,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
-      return NextResponse.json({ error: 'OCR ไม่พร้อมใช้งาน (ไม่มี ANTHROPIC_API_KEY)' }, { status: 503 })
+      return NextResponse.json({ error: 'OCR ไม่พร้อมใช้งาน (ไม่มี OPENAI_API_KEY)' }, { status: 503 })
     }
 
     const body = await req.json()
@@ -100,29 +100,24 @@ export async function POST(req: Request) {
     }
     const prompt = buildPrompt(accountNames)
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'gpt-4o-mini',
         max_tokens: 200,
         messages: [
           {
             role: 'user',
             content: [
-              {
-                type: 'image',
-                source: {
-                  type: 'base64',
-                  media_type: mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-                  data: imageBase64,
-                },
-              },
               { type: 'text', text: prompt },
+              {
+                type: 'image_url',
+                image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: 'low' },
+              },
             ],
           },
         ],
@@ -130,20 +125,19 @@ export async function POST(req: Request) {
     })
 
     if (!response.ok) {
-      const errBody = await response.text().catch(() => '')
-      console.error('[OCR] Anthropic HTTP error:', response.status, errBody)
-      const isImageError = response.status === 400
+      const err = await response.json().catch(() => ({}))
+      const errType = (err as any)?.error?.type ?? ''
+      const isImageError = response.status === 400 ||
+        errType.includes('invalid') || errType.includes('image')
       if (isImageError) {
         return NextResponse.json({ error: 'อ่านรูปไม่ได้ — ลองถ่ายรูปใหม่ให้ชัดขึ้น' }, { status: 422 })
       }
-      return NextResponse.json({ error: `OCR ล้มเหลว (${response.status})` }, { status: 500 })
+      console.error('[OCR] OpenAI error:', err)
+      return NextResponse.json({ error: 'OCR ล้มเหลว กรุณาลองใหม่' }, { status: 500 })
     }
 
-    const data = await response.json() as {
-      content: Array<{ type: string; text: string }>
-    }
-    const raw = (data.content?.[0]?.text ?? '').trim()
-    console.log('[OCR] Raw response:', raw.substring(0, 100))
+    const data = await response.json()
+    const raw  = (data.choices?.[0]?.message?.content ?? '').trim()
 
     let text: string
     let holderName: string | null = null
@@ -162,8 +156,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ text, holderName })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    console.error('[OCR] Unhandled error:', msg)
-    return NextResponse.json({ error: `Internal server error: ${msg}` }, { status: 500 })
+    console.error('[OCR] Unhandled error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
