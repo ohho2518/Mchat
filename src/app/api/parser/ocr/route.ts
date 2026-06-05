@@ -87,12 +87,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'ไม่พบรูปภาพ' }, { status: 400 })
     }
 
-    // Fetch user's account names for sender/receiver matching
-    const accounts = await prisma.account.findMany({
-      where: { userId: session.user.id, isActive: true },
-      select: { name: true },
-    })
-    const accountNames = accounts.map(a => a.name)
+    // Fetch user's account names for sender/receiver matching (fail gracefully)
+    let accountNames: string[] = []
+    try {
+      const accounts = await prisma.account.findMany({
+        where: { userId: session.user.id, isActive: true },
+        select: { name: true },
+      })
+      accountNames = accounts.map(a => a.name)
+    } catch (dbErr) {
+      console.error('[OCR] DB query failed, continuing without account names:', dbErr)
+    }
     const prompt = buildPrompt(accountNames)
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -156,7 +161,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ text, holderName })
-  } catch {
+  } catch (err) {
+    console.error('[OCR] Unhandled error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
