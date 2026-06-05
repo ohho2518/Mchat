@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-2026-06-05
+2026-06-05 (EOD)
 
 ---
 
@@ -35,7 +35,9 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 - [x] PWA (manifest.json, service worker, icons, install button in Settings)
 - [x] Vercel deploy (build script: `prisma generate && next build`)
 - [x] Account Management UI (CRUD: /accounts, API /api/accounts, AccountCard, AccountForm)
-- [x] OCR Slip + holderName feature — อ่านสลิป/บิลด้วย GPT-4o-mini, ดึง holderName, ระบุรายรับ/รายจ่ายจากชื่อบัญชี, ใช้ memo → category
+- [x] OCR Slip + holderName feature — อ่านสลิป/บิลด้วย GPT-4o-mini, ดึง holderName, ระบุรายรับ/รายจ่ายจากชื่อบัญชี, ใช้ memo → category (✅ ทดสอบ production แล้ว)
+- [x] Parser: เพิ่ม keyword "ชำระ" เป็น expense type — รองรับ text จาก OCR สลิป
+- [x] Fix: แก้ชื่อใน Settings อัปเดตทันที — JWT callback handle trigger=update
 
 ---
 

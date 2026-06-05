@@ -21,9 +21,10 @@
 - Changed: `chat/page.tsx` — `MsgParsed` มี `holderName`, `handleConfirm` ส่งไปบันทึกใน Transaction
 - Changed: `CreateTransactionSchema` + `CreateTransactionBody` รองรับ `holderName`
 
-### Changed — OCR Provider
-- Switched OCR from OpenAI GPT-4o-mini → **Anthropic Claude Haiku 4.5** (`claude-haiku-4-5-20251001`)
-- Env var เปลี่ยนจาก `OPENAI_API_KEY` → `ANTHROPIC_API_KEY`
+### Bug Fixes
+- Fixed: แก้ชื่อใน Settings แล้วไม่อัปเดต — JWT callback ไม่ handle `trigger=update` ทำให้ token ไม่เปลี่ยน → เพิ่ม handler ใน `src/lib/auth.ts`
+- Fixed: Parser ไม่รู้จัก "ชำระ" เป็น expense — เพิ่ม keyword ใน `typeDetector.ts` (44/44 tests pass)
+- Fixed: `prisma generate` ต้องรันก่อน dev server หลังแก้ schema — holderName จะ 500 ถ้าไม่ generate
 
 ### Files Changed
 `prisma/schema.prisma`, `src/app/api/parser/ocr/route.ts`, `src/lib/validators/transaction.ts`,
