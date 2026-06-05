@@ -84,6 +84,7 @@ model Transaction {
   description     String?
   rawText         String?  // ข้อความที่ผู้ใช้พิมพ์ต้นฉบับ
   paymentMethod   String?  // cash | bank_transfer | card | unknown
+  holderName      String?  // ชื่อผู้โอน/ผู้รับ จากสลิป OCR
   status          String   @default("confirmed") // draft | confirmed | deleted
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

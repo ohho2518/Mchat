@@ -12,6 +12,7 @@ export const CreateTransactionSchema = z.object({
   description:     z.string().optional(),
   rawText:         z.string().optional(),
   paymentMethod:   PaymentMethodSchema.optional(),
+  holderName:      z.string().optional(),
 })
 
 export const UpdateTransactionSchema = CreateTransactionSchema.partial()

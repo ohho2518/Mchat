@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-2026-06-04
+2026-06-05
 
 ---
 
@@ -35,6 +35,7 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 - [x] PWA (manifest.json, service worker, icons, install button in Settings)
 - [x] Vercel deploy (build script: `prisma generate && next build`)
 - [x] Account Management UI (CRUD: /accounts, API /api/accounts, AccountCard, AccountForm)
+- [x] OCR Slip + holderName feature — อ่านสลิป/บิลด้วย GPT-4o-mini, ดึง holderName, ระบุรายรับ/รายจ่ายจากชื่อบัญชี, ใช้ memo → category
 
 ---
 
@@ -66,6 +67,8 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 | `prisma/schema.prisma` | DB schema ครบ |
 | `src/data/seedCategories.ts` | parser keywords + default categories |
 | `src/lib/validators/transaction.ts` | Zod schemas ใช้ทั้ง API + frontend |
+| `src/app/api/parser/ocr/route.ts` | OCR slip — prompt + holderName logic |
+| `src/components/chat/SlipUploadButton.tsx` | กล้อง/แกลเลอรี + ส่ง holderName |
 | `tests/parser/parseTransactionText.test.ts` | 25 test cases |
 | `public/sw.js` | PWA service worker |
 

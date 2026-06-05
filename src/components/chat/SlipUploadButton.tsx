@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { cn } from '@/lib/utils/cn'
 
 interface SlipUploadButtonProps {
-  onResult:  (text: string) => void
+  onResult:  (text: string, holderName: string | null) => void
   onError?:  (msg: string) => void
   disabled?: boolean
 }
@@ -35,8 +35,9 @@ function resizeImage(file: File): Promise<{ base64: string; mimeType: string }> 
 }
 
 export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButtonProps) {
-  const [loading, setLoading] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [loading, setLoading]   = useState(false)
+  const fileRef   = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
 
   const handleFile = async (file: File) => {
     if (file.size > MAX_SIZE_MB * 1024 * 1024) {
@@ -61,31 +62,46 @@ export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButt
         return
       }
 
-      onResult(data.text)
+      onResult(data.text, data.holderName ?? null)
     } catch {
       onError?.('เกิดข้อผิดพลาด กรุณาลองใหม่')
     } finally {
       setLoading(false)
-      if (inputRef.current) inputRef.current.value = ''
+      if (fileRef.current)   fileRef.current.value   = ''
+      if (cameraRef.current) cameraRef.current.value = ''
     }
+  }
+
+  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) handleFile(file)
   }
 
   return (
     <>
+      {/* เลือกจาก Gallery / Files */}
       <input
-        ref={inputRef}
+        ref={fileRef}
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) handleFile(file)
-        }}
+        onChange={onChange}
+      />
+      {/* ถ่ายภาพจากกล้อง (mobile) */}
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={onChange}
       />
       <button
         type="button"
-        onClick={() => inputRef.current?.click()}
+        onClick={() => fileRef.current?.click()}
+        onContextMenu={(e) => { e.preventDefault(); cameraRef.current?.click() }}
         disabled={disabled || loading}
+        title="แตะเพื่อเลือกรูป | กดค้างเพื่อถ่ายรูป"
         className={cn(
           'flex h-8 w-8 items-center justify-center rounded-xl transition-colors',
           loading
@@ -93,7 +109,6 @@ export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButt
             : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600',
           'disabled:opacity-50 disabled:cursor-not-allowed'
         )}
-        title="เลือกรูปสลิป / บิล / ใบเสร็จ (รายรับ หรือ รายจ่าย)"
       >
         {loading
           ? <Loader2 className="h-4 w-4 animate-spin" />

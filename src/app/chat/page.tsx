@@ -13,6 +13,7 @@ type MsgParsed = {
   id: string; role: 'parsed'
   parsed: ParsedTransaction
   status: 'pending' | 'confirmed' | 'rejected'
+  holderName?: string | null
   savedTransaction?: Transaction   // set after confirmed — used for edit
 }
 type MessageItem = MsgUser | MsgSystem | MsgParsed
@@ -41,7 +42,7 @@ export default function ChatPage() {
   }, [messages])
 
   // ─── Parse ────────────────────────────────────────────────────────────────
-  const handleSubmit = async (text: string) => {
+  const handleSubmit = async (text: string, holderName?: string | null) => {
     const userMsg: MsgUser = { id: uid(), role: 'user', text }
     setMessages((prev) => [...prev, userMsg])
     setParsing(true)
@@ -63,7 +64,7 @@ export default function ChatPage() {
       if (!res.ok) throw new Error('parse error')
 
       const parsed: ParsedTransaction = await res.json()
-      const parsedMsg: MsgParsed = { id: uid(), role: 'parsed', parsed, status: 'pending' }
+      const parsedMsg: MsgParsed = { id: uid(), role: 'parsed', parsed, status: 'pending', holderName: holderName ?? null }
       setMessages((prev) => [...prev, parsedMsg])
     } catch {
       setMessages((prev) => [...prev, {
@@ -75,7 +76,7 @@ export default function ChatPage() {
   }
 
   // ─── Confirm ──────────────────────────────────────────────────────────────
-  const handleConfirm = async (msgId: string, parsed: ParsedTransaction) => {
+  const handleConfirm = async (msgId: string, parsed: ParsedTransaction, holderName?: string | null) => {
     setSaving(msgId)
     try {
       // Use contextDate when it's not today, OR when parser found no date
@@ -92,6 +93,7 @@ export default function ChatPage() {
           description:     parsed.description || parsed.rawText,
           rawText:         parsed.rawText,
           paymentMethod:   parsed.paymentMethod !== 'unknown' ? parsed.paymentMethod : undefined,
+          holderName:      holderName ?? undefined,
         }),
       })
 
@@ -174,7 +176,7 @@ export default function ChatPage() {
               status={msg.status}
               loading={saving === msg.id}
               overrideDate={overrideDate}
-              onConfirm={() => handleConfirm(msg.id, msg.parsed)}
+              onConfirm={() => handleConfirm(msg.id, msg.parsed, msg.holderName)}
               onReject={() => handleReject(msg.id)}
               onEdit={msg.savedTransaction ? () => setEditTarget(msg.savedTransaction!) : undefined}
             />

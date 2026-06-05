@@ -24,6 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Auth | NextAuth.js v4 (JWT strategy, credentials only) |
 | Database | Supabase PostgreSQL + Prisma ORM v6 |
 | Voice | Web Speech API built-in (lang=th-TH) |
+| OCR | Anthropic Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) |
 | Export | xlsx + papaparse |
 | PWA | public/manifest.json + public/sw.js + src/app/PwaRegister.tsx |
 | Package manager | npm |
@@ -49,6 +50,7 @@ src/
       auth/register/        ← POST สร้าง account ใหม่
       user/                 ← PATCH update profile/password
       parser/parse/         ← POST text → ParsedTransaction (ไม่ write DB)
+      parser/ocr/           ← POST image → { text, holderName } (OCR สลิป, query Account names จาก DB)
       transactions/         ← GET list, POST create
       transactions/[id]/    ← PUT update, DELETE soft-delete
       categories/           ← GET, POST
@@ -59,7 +61,7 @@ src/
 
   components/
     layout/    AppShell, Header, BottomNav
-    chat/      ChatInput, ChatMessage, ParsedTransactionCard, VoiceInputButton
+    chat/      ChatInput, ChatMessage, ParsedTransactionCard, VoiceInputButton, SlipUploadButton
     dashboard/ SummaryCard, PeriodSelector, IncomeExpenseChart, CashflowLineChart, CategoryPieChart
     transactions/ TransactionTable, TransactionFilter, TransactionForm
     categories/  CategoryList, CategoryForm
@@ -148,6 +150,7 @@ DATABASE_URL="postgresql://..."       # Supabase pooler URL — ใช้สำ�
 DIRECT_URL="postgresql://..."         # Supabase direct URL — ใช้สำหรับ prisma migrate เท่านั้น
 NEXTAUTH_SECRET="..."                 # generate: openssl rand -base64 32
 NEXTAUTH_URL="http://localhost:3000"  # production: https://mchat-git-main-vinit-deekhanu-s-projects.vercel.app
+ANTHROPIC_API_KEY="sk-ant-..."        # Anthropic API key — ใช้สำหรับ OCR สลิป (api/parser/ocr)
 ```
 
 > ทั้ง `DATABASE_URL` และ `DIRECT_URL` จำเป็นต้องมีทั้งคู่ — ดู URL แต่ละแบบได้ที่ Supabase Dashboard → Settings → Database → Connection string
@@ -183,11 +186,29 @@ Type detection priority (fixed): **transfer > debt > expense > income**
 - `GET /api/dashboard/category-expense?period=...` คืน breakdown ตามหมวดหมู่
 - Dashboard page group daily → monthly เมื่อ period = "year"
 
+### OCR Slip Flow
+```
+User กดปุ่มกล้อง → เลือกรูป/ถ่ายภาพ
+  → SlipUploadButton resize → POST /api/parser/ocr
+  → route ดึง Account.name ทั้งหมดของ user จาก DB
+  → ส่งชื่อบัญชีไปใน prompt → GPT-4o-mini อ่านสลิป
+  → return { text, holderName }
+  → ChatInput เก็บ holderName ไว้ใน pendingHolder state
+  → User Submit → handleSubmit(text, holderName)
+  → parse → MsgParsed บันทึก holderName
+  → ยืนยัน → POST /api/transactions พร้อม holderName
+```
+- เปรียบเทียบชื่อใน slip กับ **Account.name** ของ user (ไม่ใช่ user.name)
+- ถ้าชื่อผู้โอน = บัญชีของตัวเอง → รายจ่าย | ถ้าชื่อผู้รับ = บัญชีของตัวเอง → รายรับ
+- ถ้าผู้รับเป็นชื่อร้านค้า → รายจ่าย (ชำระ...)
+- Memo/บันทึกในสลิปจะถูกใส่ใน text เพื่อให้ parser จับ keyword → หมวดหมู่อัตโนมัติ
+
 ### Database
 - Soft delete เท่านั้น: `status = 'deleted'` (ห้าม hard delete Transaction)
 - ทุก query filter: `status: { not: 'deleted' }`
 - Transfer/Debt type ไม่นับใน dashboard sum (filter `type: { in: ['income','expense'] }`)
 - Schema มี model: `User`, `Account`, `Category`, `CategoryKeyword`, `Transaction`, `Transfer`, `Debt`
+- `Transaction` มี field `holderName` (String?) — ชื่อคู่ค้าจากสลิป OCR
 - `Account`, `Transfer`, `Debt` model มีใน schema แต่ยังไม่มี CRUD API/UI รองรับ
 
 ---
@@ -243,6 +264,7 @@ Type detection priority (fixed): **transfer > debt > expense > income**
 | เพิ่ม component | `src/components/<group>/ComponentName.tsx` + อัปเดต `index.ts` |
 | เพิ่ม API endpoint | `src/app/api/<group>/route.ts` + validator ใน `src/lib/validators/` |
 | เพิ่ม DB field | `prisma/schema.prisma` → `npx prisma migrate dev` → อัปเดต types |
+| แก้ OCR prompt | `src/app/api/parser/ocr/route.ts` → buildPrompt() |
 | เพิ่ม parser keyword | `src/data/seedCategories.ts` (keywords array) → re-seed |
 | แก้ parser logic | `src/lib/parser/*.ts` → รัน test ด้วย `npx tsx tests/parser/...` |
 | แก้ dashboard chart | `src/components/dashboard/` + `src/app/api/dashboard/*/route.ts` |

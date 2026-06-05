@@ -15,6 +15,7 @@ export interface Transaction {
   description?: string
   rawText?: string
   paymentMethod?: PaymentMethod
+  holderName?: string | null
   status: TransactionStatus
   createdAt: string
   updatedAt: string
@@ -41,6 +42,7 @@ export interface CreateTransactionBody {
   description?: string
   rawText?: string
   paymentMethod?: PaymentMethod
+  holderName?: string
 }
 
 export interface TransactionFilter {

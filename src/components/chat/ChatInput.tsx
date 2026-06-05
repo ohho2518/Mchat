@@ -6,20 +6,22 @@ import { VoiceInputButton } from './VoiceInputButton'
 import { SlipUploadButton } from './SlipUploadButton'
 
 interface ChatInputProps {
-  onSubmit:  (text: string) => void
+  onSubmit:  (text: string, holderName?: string | null) => void
   onError?:  (msg: string) => void
   disabled?: boolean
 }
 
 export function ChatInput({ onSubmit, onError, disabled }: ChatInputProps) {
-  const [text, setText] = useState('')
+  const [text,            setText]           = useState('')
+  const [pendingHolder,   setPendingHolder]  = useState<string | null>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
 
   const submit = () => {
     const trimmed = text.trim()
     if (!trimmed || disabled) return
-    onSubmit(trimmed)
+    onSubmit(trimmed, pendingHolder)
     setText('')
+    setPendingHolder(null)
     if (taRef.current) taRef.current.style.height = 'auto'
   }
 
@@ -32,14 +34,17 @@ export function ChatInput({ onSubmit, onError, disabled }: ChatInputProps) {
 
   const onInput = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value)
+    // Manual typing clears OCR holder context
+    if (pendingHolder) setPendingHolder(null)
     const el = e.target
     el.style.height = 'auto'
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`
   }
 
-  // OCR result: fill input + focus so user can review before sending
-  const handleOcrResult = (ocrText: string) => {
+  // OCR result: fill input + keep holderName for submit
+  const handleOcrResult = (ocrText: string, holderName: string | null) => {
     setText(ocrText)
+    setPendingHolder(holderName)
     setTimeout(() => taRef.current?.focus(), 50)
   }
 

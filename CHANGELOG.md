@@ -4,6 +4,34 @@
 
 ---
 
+## 2026-06-05
+
+### Features — OCR Slip + holderName
+
+- Added: `holderName` field ใน `Transaction` model (Prisma schema + DB migration)
+- Added: `/api/parser/ocr` อัปเกรด — ดึงชื่อบัญชี (Account.name) ของ user จาก DB ส่งเข้า prompt
+- Added: OCR logic ระบุทิศทางเงินจากชื่อบัญชี (ไม่ใช่ชื่อ login)
+  - ชื่อผู้โอน = บัญชีตัวเอง → รายจ่าย (โอนเงิน)
+  - ชื่อผู้รับ = บัญชีตัวเอง → รายรับ (รับโอน)
+  - ผู้รับเป็นชื่อร้านค้า → รายจ่าย (ชำระ)
+  - ดึง memo/บันทึกในสลิปใส่ใน text → parser จับ keyword → หมวดหมู่อัตโนมัติ
+- Added: `SlipUploadButton` รองรับ **ถ่ายภาพจากกล้อง** (`capture="environment"`) และเลือกจาก Gallery
+- Changed: OCR response เพิ่ม `holderName` — `{ text, holderName }` แทนที่ `{ text }` เดิม
+- Changed: `ChatInput` เก็บ `pendingHolder` state → ส่งพร้อม submit
+- Changed: `chat/page.tsx` — `MsgParsed` มี `holderName`, `handleConfirm` ส่งไปบันทึกใน Transaction
+- Changed: `CreateTransactionSchema` + `CreateTransactionBody` รองรับ `holderName`
+
+### Changed — OCR Provider
+- Switched OCR from OpenAI GPT-4o-mini → **Anthropic Claude Haiku 4.5** (`claude-haiku-4-5-20251001`)
+- Env var เปลี่ยนจาก `OPENAI_API_KEY` → `ANTHROPIC_API_KEY`
+
+### Files Changed
+`prisma/schema.prisma`, `src/app/api/parser/ocr/route.ts`, `src/lib/validators/transaction.ts`,
+`src/types/transaction.ts`, `src/components/chat/SlipUploadButton.tsx`,
+`src/components/chat/ChatInput.tsx`, `src/app/chat/page.tsx`
+
+---
+
 ## 2026-06-04
 
 ### Documentation
