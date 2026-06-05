@@ -130,20 +130,20 @@ export async function POST(req: Request) {
     })
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
-      const errType = (err as any)?.error?.type ?? ''
-      const isImageError = response.status === 400 || errType.includes('invalid')
+      const errBody = await response.text().catch(() => '')
+      console.error('[OCR] Anthropic HTTP error:', response.status, errBody)
+      const isImageError = response.status === 400
       if (isImageError) {
         return NextResponse.json({ error: 'อ่านรูปไม่ได้ — ลองถ่ายรูปใหม่ให้ชัดขึ้น' }, { status: 422 })
       }
-      console.error('Anthropic error:', err)
-      return NextResponse.json({ error: 'OCR ล้มเหลว กรุณาลองใหม่' }, { status: 500 })
+      return NextResponse.json({ error: `OCR ล้มเหลว (${response.status})` }, { status: 500 })
     }
 
     const data = await response.json() as {
       content: Array<{ type: string; text: string }>
     }
     const raw = (data.content?.[0]?.text ?? '').trim()
+    console.log('[OCR] Raw response:', raw.substring(0, 100))
 
     let text: string
     let holderName: string | null = null
@@ -162,7 +162,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ text, holderName })
   } catch (err) {
-    console.error('[OCR] Unhandled error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[OCR] Unhandled error:', msg)
+    return NextResponse.json({ error: `Internal server error: ${msg}` }, { status: 500 })
   }
 }
