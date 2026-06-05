@@ -28,12 +28,17 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    jwt({ token, user, trigger, session: updateData }) {
       if (user) token.userId = user.id
+      // Handle update() call from client — update name in JWT token
+      if (trigger === 'update' && updateData?.name) {
+        token.name = updateData.name
+      }
       return token
     },
     session({ session, token }) {
       if (token.userId) session.user.id = token.userId as string
+      if (token.name)   session.user.name = token.name as string
       return session
     },
   },
