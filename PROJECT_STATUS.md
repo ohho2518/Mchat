@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-2026-06-06 (Referral & Affiliate System Phase 4–5 complete)
+2026-06-06 EOD — Referral system ครบ + Landing page + BottomNav
 
 ---
 
@@ -69,6 +69,18 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
   - `PATCH /api/admin/referral/payouts/[id]` — pay (mark commissions paid) / reject
   - `/referral` page — referral dashboard: code card + share, stats, payout form, commission history
   - `/admin` page — Commissions + Payout Requests sections with approve/cancel/pay/reject actions
+- [x] **Referral UX Polish (2026-06-06)**:
+  - QR code + Download button ใน `/referral` page
+  - `/download` landing page — hero, features, PWA install, register CTA
+  - `/ref/[code]` redirect ไป `/download` (แทน `/login`) พร้อม badge "เพื่อนแนะนำมา"
+  - Middleware: `/download` + `/ref` เป็น public routes (ไม่ต้อง auth)
+  - `SiteSetting` model — key/value store สำหรับ configurable content
+  - `GET /api/referral/terms` — public terms endpoint (default → DB override)
+  - `GET /api/admin/settings` + `PATCH` — admin แก้ไขเงื่อนไข referral
+  - `/download` — collapsible referral terms section (commission table + rules)
+  - `/admin` — Referral Terms Editor (rates, holdDays, minPayout, payoutDay, extraNote)
+  - Header — amber chip "💰 แนะนำเพื่อน" ทุกหน้าที่ login → `/referral`
+  - BottomNav — เพิ่ม tab "แนะนำเพื่อน" (Gift icon) ครบ 5 tabs
 - [x] **Phase 3: Omise Automated Payment**:
   - `src/lib/omise.ts` — Omise client wrapper (createPromptPayCharge, createCardCharge, retrieveEvent)
   - `POST /api/omise/charge` — สร้าง charge (PromptPay/Card) + บันทึก Payment
@@ -125,7 +137,7 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 
 ## In Progress
 
-Phase 1 Plan System เสร็จแล้ว — รอ QA + Phase 2 (Payment flow)
+ไม่มี — รอ QA ใน production
 
 ---
 
@@ -133,16 +145,11 @@ Phase 1 Plan System เสร็จแล้ว — รอ QA + Phase 2 (Payment
 
 เรียงตามลำดับความสำคัญ:
 
-1. **ตั้งค่า Omise env vars บน Vercel** — `OMISE_SECRET_KEY` + `OMISE_PUBLIC_KEY` (จาก Omise Dashboard → Settings → Keys)
-2. **ตั้งค่า Omise Webhook** — Omise Dashboard → Webhooks → เพิ่ม URL: `https://your-domain.vercel.app/api/webhooks/omise`
-3. **QA ใน Production** — ทดสอบ payment flow บน Test mode ก่อน (Omise test card: 4242 4242 4242 4242)
-4. **Switch Omise to Live mode** — เปลี่ยน `skey_test_` → `skey_` และ `pkey_test_` → `pkey_` เมื่อพร้อม
-3. ~~**Transfer UI**~~ ✅ เสร็จ
-4. ~~**Debt Tracking UI**~~ ✅ เสร็จ
-5. ~~**Account Management UI**~~ ✅ เสร็จ
-6. ~~**Parser improvement**~~ ✅ เสร็จ
-7. ~~**E2E tests**~~ ✅ เสร็จ
-8. ~~**Security & Bug Fix Pass**~~ ✅ เสร็จ
+1. **QA ทดสอบ Referral flow** — Scan QR → /download → register → commission hook ทำงาน
+2. **ตั้งค่า Omise env vars บน Vercel** — `OMISE_SECRET_KEY` + `OMISE_PUBLIC_KEY`
+3. **ตั้งค่า Omise Webhook** — `https://your-domain.vercel.app/api/webhooks/omise`
+4. **QA Omise payment** — ทดสอบ Test mode (test card: 4242 4242 4242 4242)
+5. **Switch Omise to Live mode** — เมื่อพร้อม launch จริง
 
 ---
 
