@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-2026-06-06 (EOD — security & bug fix pass)
+2026-06-06 (Plan/Feature Gate system — Phase 1)
 
 ---
 
@@ -47,6 +47,19 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 - [x] **Admin Analytics** — GET /api/admin/analytics, หน้า /admin (events, daily chart, top users, OCR stats, feedbacks)
 - [x] **OCR Correction + Learning Data** — OcrReviewModal ให้ user แก้ข้อความ OCR ก่อน submit, บันทึก correction ลง OcrCorrection table, GET /api/ocr-corrections สำหรับ admin export
 - [x] **Transfer UI** — หน้า /transfers, TransferCard/TransferForm, API CRUD (/api/transfers, /api/transfers/[id]), linked from Settings
+- [x] **Plan/Feature Gate System (Phase 1)** — FREE/PRO/MAX plan tiers:
+  - DB: `Plan` enum, `UsageQuota` model, `Payment` model + `PaymentStatus` enum on User
+  - `src/lib/features.ts` — PLAN_LIMITS, PLAN_LABELS, PLAN_COLORS, PLAN_PRICES, getThaiMonth()
+  - Auth: plan included in JWT + session (login fetches plan from DB)
+  - OCR: monthly quota per plan (FREE=20, PRO=100, MAX=unlimited) — tracked in UsageQuota
+  - Transactions: history capped at 90 days for free plan (GET enforces cutoff)
+  - Categories: max 5 custom categories for free plan (POST returns 403 PLAN_LIMIT_CATEGORIES)
+  - Accounts: max 2 accounts for free plan (POST returns 403 PLAN_LIMIT_ACCOUNTS)
+  - Admin: GET /api/admin/users + PATCH /api/admin/users/[id]/plan — plan management + Payment record
+  - Settings: แสดง plan badge + OCR usage progress bar + upgrade nudge
+  - Admin page: User management section — list users + plan editor per row
+  - `GET /api/user/quota` — ดึงสถานะ OCR quota ของ user
+  - `src/components/ui/UpgradePrompt.tsx` — reusable upgrade prompt (compact + card)
 - [x] **Security & Bug Fix Pass (15 issues)** — Critical/High/Medium ทั้งหมดแก้แล้ว:
   - Bug: date range filter ใน transactions API (startDate+endDate spread overwrite กัน)
   - Security: OCR rate limiting (10 req/min/user), mimeType allowlist, base64 size limit (20 MB), fetch timeout (20s)
@@ -64,7 +77,7 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 
 ## In Progress
 
-ไม่มีงานที่กำลังทำอยู่ — รอ feedback จากการใช้งานจริง
+Phase 1 Plan System เสร็จแล้ว — รอ QA + Phase 2 (Payment flow)
 
 ---
 
@@ -73,7 +86,9 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 เรียงตามลำดับความสำคัญ:
 
 1. **QA ใน Production** — ทดสอบ golden path บน mobile browser จริง (Android Chrome, iOS Safari)
-2. **ตั้งค่า ADMIN_EMAIL env var บน Vercel** — `ADMIN_EMAIL=vndn2518@gmail.com` (จำเป็น หลังจากลบ hardcode fallback)
+2. **Phase 2: Payment Flow** — PromptPay QR code generation + Omise webhook + auto plan activation
+3. **Phase 1.5: Frontend enforcement** — UpgradePrompt ใน AccountForm, CategoryForm, Export button, Transfers/Debts pages
+4. **ตั้งค่า ADMIN_EMAIL env var บน Vercel** — `ADMIN_EMAIL=vndn2518@gmail.com` (จำเป็น หลังจากลบ hardcode fallback)
 3. ~~**Transfer UI**~~ ✅ เสร็จ
 4. ~~**Debt Tracking UI**~~ ✅ เสร็จ
 5. ~~**Account Management UI**~~ ✅ เสร็จ
@@ -128,6 +143,9 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 | Prisma v6 + Next.js 16 | เวอร์ชันล่าสุดตอน init โปรเจกต์ |
 | scrypt N:salt:hash format | เก็บ cost factor ไว้ใน hash string เพื่อ backward-compat เมื่อ upgrade N ในอนาคต |
 | In-memory rate limiting (Map) | ไม่ต้องการ Redis สำหรับ scale ปัจจุบัน; per-instance แต่เพียงพอสำหรับ personal app |
+| Plan ใน JWT token (ไม่ query DB ทุก request) | ลด DB load; plan สตาเลถ้า admin เปลี่ยน plan — user ต้อง re-login เพื่อให้มีผล |
+| UsageQuota keyed ด้วย userId+month (Thai timezone) | นับ OCR ต่อเดือนตาม TZ ไทย (UTC+7) เพื่อให้ตรงกับความคาดหวังผู้ใช้ |
+| db push (ไม่ใช้ migrate) | ลด friction สำหรับ Supabase cloud; ใช้ migrate เฉพาะเมื่อต้องการ rollback history |
 
 ---
 

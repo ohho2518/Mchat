@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
 import { CreateCategorySchema } from '@/lib/validators/category'
+import { PLAN_LIMITS } from '@/lib/features'
+import type { Plan } from '@/lib/features'
 
 export async function GET() {
   try {
@@ -34,6 +36,22 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Enforce custom category limit per plan
+    const plan      = (session.user.plan ?? 'free') as Plan
+    const catLimit  = PLAN_LIMITS[plan].categories
+    if (catLimit !== null) {
+      const count = await prisma.category.count({
+        where: { userId: session.user.id, isActive: true },
+      })
+      if (count >= catLimit) {
+        return NextResponse.json({
+          error: `แผน ${plan.toUpperCase()} สร้างหมวดหมู่ได้สูงสุด ${catLimit} หมวดหมู่`,
+          code:  'PLAN_LIMIT_CATEGORIES',
+          limit: catLimit,
+        }, { status: 403 })
+      }
     }
 
     const body = await req.json()

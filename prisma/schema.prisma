@@ -11,16 +11,32 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ─── Enums ───────────────────────────────────────────────
+enum Plan {
+  free
+  pro
+  max
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
 // ─── Users ───────────────────────────────────────────────
 model User {
-  id           String        @id @default(uuid())
-  name         String
-  email        String        @unique
-  passwordHash String?
-  currency     String        @default("THB")
-  monthStart   Int           @default(1) // วันเริ่มต้นเดือนบัญชี
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  passwordHash  String?
+  currency      String    @default("THB")
+  monthStart    Int       @default(1)
+  plan          Plan      @default(free)
+  planExpiresAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   accounts       Account[]
   categories     Category[]
@@ -30,6 +46,8 @@ model User {
   appEvents      AppEvent[]
   feedbacks      Feedback[]
   ocrCorrections OcrCorrection[]
+  usageQuotas    UsageQuota[]
+  payments       Payment[]
 }
 
 // ─── Accounts ─────────────────────────────────────────────
@@ -170,4 +188,33 @@ model Debt {
   updatedAt       DateTime  @updatedAt
 
   user            User      @relation(fields: [userId], references: [id])
+}
+
+// ─── Usage Quotas ─────────────────────────────────────────
+model UsageQuota {
+  id        String   @id @default(uuid())
+  userId    String
+  month     String   // "2026-06" (Thai timezone YYYY-MM)
+  ocrCount  Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id])
+  @@unique([userId, month])
+}
+
+// ─── Payments ─────────────────────────────────────────────
+model Payment {
+  id            String        @id @default(uuid())
+  userId        String
+  plan          Plan
+  months        Int           @default(1)
+  amount        Decimal       @db.Decimal(10, 2)
+  status        PaymentStatus @default(pending)
+  method        String        // "promptpay" | "manual"
+  omiseChargeId String?
+  note          String?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+
+  user          User          @relation(fields: [userId], references: [id])
 }

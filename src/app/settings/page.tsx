@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { LogOut, Pencil, X, Check, Info, Download, Wallet, Tag, ChevronRight, HandCoins, BarChart2, ArrowLeftRight } from 'lucide-react'
+import { LogOut, Pencil, X, Check, Info, Download, Wallet, Tag, ChevronRight, HandCoins, BarChart2, ArrowLeftRight, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
+import { PLAN_LABELS, PLAN_COLORS, PLAN_PRICES } from '@/lib/features'
+import type { Plan } from '@/lib/features'
 
 const ProfileSchema = z.object({
   name: z.string().min(1, 'กรุณาระบุชื่อ').max(50),
@@ -37,6 +39,9 @@ export default function SettingsPage() {
   const [passSuccess, setPassSuccess] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [isInstalled, setIsInstalled] = useState(false)
+  const [quota, setQuota] = useState<{
+    plan: Plan; ocrCount: number; ocrLimit: number | null; month: string
+  } | null>(null)
 
   useEffect(() => {
     const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e) }
@@ -44,6 +49,13 @@ export default function SettingsPage() {
     window.addEventListener('appinstalled', () => setIsInstalled(true))
     if (window.matchMedia('(display-mode: standalone)').matches) setIsInstalled(true)
     return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/user/quota')
+      .then(r => r.json())
+      .then(data => setQuota(data))
+      .catch(() => {})
   }, [])
 
   const handleInstall = async () => {
@@ -132,6 +144,60 @@ export default function SettingsPage() {
             <p className="font-semibold text-gray-900">{session.user.name}</p>
             <p className="text-sm text-gray-500">{session.user.email}</p>
           </div>
+        </div>
+      </Card>
+
+      {/* Plan & Usage */}
+      <Card id="plan">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-gray-700">แผนของฉัน</p>
+            {quota && (
+              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold border
+                ${PLAN_COLORS[quota.plan].bg} ${PLAN_COLORS[quota.plan].text} ${PLAN_COLORS[quota.plan].border}`}>
+                <Zap className="h-3 w-3" />
+                {PLAN_LABELS[quota.plan]}
+              </span>
+            )}
+          </div>
+
+          {quota && (
+            <div className="space-y-2">
+              {/* OCR usage */}
+              <div>
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>OCR อ่านสลิป (เดือนนี้)</span>
+                  <span className="font-medium">
+                    {quota.ocrCount} / {quota.ocrLimit ?? '∞'} ครั้ง
+                  </span>
+                </div>
+                {quota.ocrLimit !== null && (
+                  <div className="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        quota.ocrCount / quota.ocrLimit >= 0.9 ? 'bg-red-500' :
+                        quota.ocrCount / quota.ocrLimit >= 0.7 ? 'bg-amber-400' : 'bg-blue-500'
+                      }`}
+                      style={{ width: `${Math.min(100, (quota.ocrCount / quota.ocrLimit) * 100)}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Upgrade nudge for free plan */}
+              {quota.plan === 'free' && (
+                <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 text-xs text-blue-700 space-y-1">
+                  <p className="font-medium">อัปเกรดเป็น Pro เพื่อรับสิทธิ์เพิ่ม</p>
+                  <ul className="space-y-0.5 text-blue-600">
+                    <li>• OCR 100 ครั้ง/เดือน (ปัจจุบัน 20)</li>
+                    <li>• ดูประวัติไม่จำกัด (ปัจจุบัน 90 วัน)</li>
+                    <li>• Export Excel/CSV, บัญชีไม่จำกัด</li>
+                  </ul>
+                  <p className="font-semibold mt-1">฿{PLAN_PRICES.pro.monthly}/เดือน</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Card>
 

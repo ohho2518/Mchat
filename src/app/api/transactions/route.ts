@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
 import { CreateTransactionSchema, TransactionFilterSchema } from '@/lib/validators/transaction'
+import { PLAN_LIMITS } from '@/lib/features'
+import type { Plan } from '@/lib/features'
 
 export async function GET(req: Request) {
   try {
@@ -20,15 +22,31 @@ export async function GET(req: Request) {
     const { startDate, endDate, type, categoryId, keyword, page, limit } = parsed.data
     const skip = (page - 1) * limit
 
+    // Enforce history limit for free plan
+    const plan        = (session.user.plan ?? 'free') as Plan
+    const historyDays = PLAN_LIMITS[plan].historyDays
+    const cutoff      = historyDays !== null
+      ? new Date(Date.now() - historyDays * 24 * 60 * 60 * 1000)
+      : null
+
+    // Merge user-provided startDate with plan cutoff (take the later/more restrictive)
+    let effectiveGte: Date | undefined
+    if (startDate) {
+      const parsed = new Date(startDate)
+      effectiveGte = cutoff && cutoff > parsed ? cutoff : parsed
+    } else if (cutoff) {
+      effectiveGte = cutoff
+    }
+
     const where = {
       userId: session.user.id,
       status: { not: 'deleted' as const },
       ...(type        && { type }),
       ...(categoryId  && { categoryId }),
-      ...((startDate || endDate) && {
+      ...((effectiveGte || endDate) && {
         transactionDate: {
-          ...(startDate && { gte: new Date(startDate) }),
-          ...(endDate   && { lte: new Date(endDate) }),
+          ...(effectiveGte && { gte: effectiveGte }),
+          ...(endDate      && { lte: new Date(endDate) }),
         },
       }),
       ...(keyword     && {
@@ -53,6 +71,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       data: transactions,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      historyLimitDays: historyDays,
     })
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

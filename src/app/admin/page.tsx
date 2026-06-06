@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { PLAN_LABELS, PLAN_COLORS } from '@/lib/features'
+import type { Plan } from '@/lib/features'
 
 interface EventCount  { event: string; count: number }
 interface DailyEvent  { day: string;   count: number }
@@ -16,6 +18,11 @@ interface Analytics {
   recentFeedback:     FeedbackRow[]
   ocrCorrectionCount: number
 }
+interface AdminUser {
+  id: string; name: string; email: string
+  plan: Plan; planExpiresAt: string | null; createdAt: string
+  _count: { transactions: number }
+}
 
 const EVENT_LABELS: Record<string, string> = {
   transaction_saved:    'บันทึกรายการ',
@@ -30,10 +37,105 @@ const CATEGORY_LABEL: Record<string, string> = {
   bug: 'บัค', feature: 'ฟีเจอร์', general: 'ทั่วไป',
 }
 
+function UserPlanEditor({ user, onUpdated }: { user: AdminUser; onUpdated: (u: AdminUser) => void }) {
+  const [open,    setOpen]    = useState(false)
+  const [plan,    setPlan]    = useState<Plan>(user.plan)
+  const [months,  setMonths]  = useState(1)
+  const [note,    setNote]    = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const save = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/plan`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ plan, months, amount: 0, method: 'manual', note }),
+      })
+      if (!res.ok) throw new Error()
+      const updated = await res.json() as AdminUser
+      onUpdated(updated)
+      setOpen(false)
+    } catch {
+      alert('อัปเดต plan ไม่สำเร็จ')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="text-xs text-blue-600 hover:underline"
+      >
+        เปลี่ยน Plan
+      </button>
+      {open && (
+        <div className="mt-2 p-3 rounded-lg bg-gray-50 border border-gray-200 space-y-2">
+          <div className="flex gap-2">
+            {(['free', 'pro', 'max'] as Plan[]).map(p => (
+              <button
+                key={p}
+                onClick={() => setPlan(p)}
+                className={`flex-1 rounded-lg py-1 text-xs font-semibold border transition-colors ${
+                  plan === p
+                    ? `${PLAN_COLORS[p].bg} ${PLAN_COLORS[p].text} ${PLAN_COLORS[p].border}`
+                    : 'text-gray-500 border-gray-200'
+                }`}
+              >
+                {PLAN_LABELS[p]}
+              </button>
+            ))}
+          </div>
+          {plan !== 'free' && (
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-600 shrink-0">ระยะเวลา</label>
+              <select
+                value={months}
+                onChange={e => setMonths(Number(e.target.value))}
+                className="flex-1 rounded-lg border border-gray-200 px-2 py-1 text-xs"
+              >
+                {[1,2,3,6,12].map(m => (
+                  <option key={m} value={m}>{m} เดือน</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <input
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="หมายเหตุ (เช่น โอน PromptPay)"
+            className="w-full rounded-lg border border-gray-200 px-2 py-1 text-xs"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={save}
+              disabled={loading}
+              className="flex-1 rounded-lg bg-blue-600 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? '...' : 'บันทึก'}
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              className="flex-1 rounded-lg border border-gray-200 py-1.5 text-xs text-gray-600"
+            >
+              ยกเลิก
+            </button>
+          </div>
+          <p className="text-xs text-amber-600">* ผู้ใช้ต้อง sign-out/sign-in ใหม่เพื่อให้ plan มีผล</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AdminPage() {
   const [data,    setData]    = useState<Analytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState<string | null>(null)
+  const [users,   setUsers]   = useState<AdminUser[]>([])
+  const [usersLoading, setUsersLoading] = useState(true)
 
   useEffect(() => {
     fetch('/api/admin/analytics')
@@ -45,6 +147,12 @@ export default function AdminPage() {
       .then(setData)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
+
+    fetch('/api/admin/users')
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(setUsers)
+      .catch(() => {})
+      .finally(() => setUsersLoading(false))
   }, [])
 
   if (loading) return <div className="p-8 text-center text-gray-500 text-sm">กำลังโหลด...</div>
@@ -98,6 +206,43 @@ export default function AdminPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* User Plan Management */}
+      <section>
+        <h2 className="text-sm font-semibold text-gray-600 mb-3">จัดการ Plan ผู้ใช้</h2>
+        {usersLoading ? (
+          <p className="text-sm text-gray-400 text-center py-4">กำลังโหลด...</p>
+        ) : (
+          <div className="rounded-xl bg-white border border-gray-100 shadow-sm divide-y divide-gray-50">
+            {users.map((u) => (
+              <div key={u.id} className="px-4 py-3 space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{u.name}</p>
+                    <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                  </div>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border
+                    ${PLAN_COLORS[u.plan].bg} ${PLAN_COLORS[u.plan].text} ${PLAN_COLORS[u.plan].border}`}>
+                    {PLAN_LABELS[u.plan]}
+                  </span>
+                  <span className="text-xs text-gray-400 shrink-0">{u._count.transactions} รายการ</span>
+                </div>
+                {u.planExpiresAt && (
+                  <p className="text-xs text-gray-400">
+                    หมดอายุ: {new Date(u.planExpiresAt).toLocaleDateString('th-TH')}
+                  </p>
+                )}
+                <UserPlanEditor
+                  user={u}
+                  onUpdated={(updated) =>
+                    setUsers(prev => prev.map(x => x.id === updated.id ? { ...x, ...updated } : x))
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* OCR Learning Data */}

@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
+import { PLAN_LIMITS, getThaiMonth } from '@/lib/features'
+import type { Plan } from '@/lib/features'
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
-const MAX_B64_LEN  = 20 * 1024 * 1024  // ~15 MB original after base64 inflation
+const MAX_B64_LEN  = 20 * 1024 * 1024
 
 // 10 OCR calls per 60 s per user (per serverless instance)
 const ocrRateMap = new Map<string, { count: number; resetAt: number }>()
@@ -91,6 +93,28 @@ export async function POST(req: Request) {
 
     if (!checkOcrRate(session.user.id)) {
       return NextResponse.json({ error: 'ส่งรูปเร็วเกินไป กรุณารอสักครู่' }, { status: 429 })
+    }
+
+    // Monthly quota check
+    const plan      = (session.user.plan ?? 'free') as Plan
+    const ocrLimit  = PLAN_LIMITS[plan].ocrPerMonth
+    const month     = getThaiMonth()
+
+    if (ocrLimit !== null) {
+      const quota = await prisma.usageQuota.upsert({
+        where:  { userId_month: { userId: session.user.id, month } },
+        create: { userId: session.user.id, month, ocrCount: 0 },
+        update: {},
+        select: { ocrCount: true },
+      })
+      if (quota.ocrCount >= ocrLimit) {
+        return NextResponse.json({
+          error: `ใช้ OCR ครบ ${ocrLimit} ครั้งแล้วในเดือนนี้ (แผน ${plan.toUpperCase()})`,
+          code:  'OCR_QUOTA_EXCEEDED',
+          used:  quota.ocrCount,
+          limit: ocrLimit,
+        }, { status: 429 })
+      }
     }
 
     const apiKey = process.env.OPENAI_API_KEY
@@ -180,6 +204,14 @@ export async function POST(req: Request) {
 
     if (!text || text === 'อ่านไม่ได้') {
       return NextResponse.json({ error: 'อ่านรูปไม่ได้ — ลองถ่ายรูปใหม่ให้ชัดขึ้น' }, { status: 422 })
+    }
+
+    // Increment monthly quota after successful OCR
+    if (ocrLimit !== null) {
+      await prisma.usageQuota.update({
+        where: { userId_month: { userId: session.user.id, month } },
+        data:  { ocrCount: { increment: 1 } },
+      })
     }
 
     return NextResponse.json({ text, holderName })
