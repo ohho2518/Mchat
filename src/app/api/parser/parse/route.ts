@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { unstable_cache } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
@@ -8,6 +9,18 @@ import { z } from 'zod'
 const BodySchema = z.object({
   text: z.string().min(1).max(500),
 })
+
+// Cache categories per user — revalidate ทุก 5 นาที
+function getCachedCategories(userId: string) {
+  return unstable_cache(
+    () => prisma.category.findMany({
+      where: { isActive: true, OR: [{ userId: null }, { userId }] },
+      include: { keywords: true },
+    }),
+    [`parse-categories-${userId}`],
+    { revalidate: 300 }
+  )()
+}
 
 export async function POST(req: Request) {
   try {
@@ -22,14 +35,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
     }
 
-    // ดึง categories (default + ของ user นี้) สำหรับ category detection
-    const categories = await prisma.category.findMany({
-      where: {
-        isActive: true,
-        OR: [{ userId: null }, { userId: session.user.id }],
-      },
-      include: { keywords: true },
-    })
+    const categories = await getCachedCategories(session.user.id)
 
     const categoryMap: CategoryKeywordMap[] = categories.map((c) => ({
       categoryName: c.name,
