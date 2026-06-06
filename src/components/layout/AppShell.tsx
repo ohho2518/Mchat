@@ -39,7 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <BottomNav />
-      <FeedbackButton />
+      {!isChat && <FeedbackButton />}
     </div>
   )
 }
