@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-2026-06-06 (Plan system Phase 1+1.5+2 complete)
+2026-06-06 (Referral & Affiliate System Phase 4–5 complete)
 
 ---
 
@@ -47,6 +47,37 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 - [x] **Admin Analytics** — GET /api/admin/analytics, หน้า /admin (events, daily chart, top users, OCR stats, feedbacks)
 - [x] **OCR Correction + Learning Data** — OcrReviewModal ให้ user แก้ข้อความ OCR ก่อน submit, บันทึก correction ลง OcrCorrection table, GET /api/ocr-corrections สำหรับ admin export
 - [x] **Transfer UI** — หน้า /transfers, TransferCard/TransferForm, API CRUD (/api/transfers, /api/transfers/[id]), linked from Settings
+- [x] **Referral & Affiliate System Phase 1–3**:
+  - DB: `ReferralCode`, `Referral`, `Commission`, `PayoutRequest` models + User relations
+  - `src/lib/referral.ts` — generateReferralCode()
+  - `src/lib/commission.ts` — COMMISSION_TABLE, getPlanCode, createCommissionAfterPayment()
+  - `/ref/[code]` — validate code → set localStorage (30 days) → redirect to /login (+ click counter)
+  - `POST /api/ref/click` — increment click counter
+  - `POST /api/auth/register` — สร้าง ReferralCode ของตัวเอง + ผูก Referral ถ้ามี refCode
+  - `/login` — refCode field (auto-fill จาก localStorage), `?mode=register` param
+  - Commission hooks: admin payment confirm, Omise webhook, Omise card charge
+  - Pricing modal — refCode input field (ใช้ได้ทั้ง Omise + manual flow)
+  - Fraud rules: no self-referral, 1 referred user → 1 referrer, commission เฉพาะ paid payment
+- [x] **Referral & Affiliate System Phase 4–5**:
+  - `GET /api/referral/code` — lazy-create + return referral code ของ user
+  - `GET /api/referral/stats` — clicks, signups, conversions, pending/available commission
+  - `GET /api/referral/commissions` — commission history ของ user
+  - `POST /api/referral/payout` + `GET /api/referral/payout` — ขอถอนเงิน + ประวัติ (min ฿300, masked account)
+  - `GET /api/admin/referral/commissions` — admin list all commissions
+  - `PATCH /api/admin/referral/commissions/[id]` — approve (check holdUntil) / cancel
+  - `GET /api/admin/referral/payouts` — admin list all payout requests
+  - `PATCH /api/admin/referral/payouts/[id]` — pay (mark commissions paid) / reject
+  - `/referral` page — referral dashboard: code card + share, stats, payout form, commission history
+  - `/admin` page — Commissions + Payout Requests sections with approve/cancel/pay/reject actions
+- [x] **Phase 3: Omise Automated Payment**:
+  - `src/lib/omise.ts` — Omise client wrapper (createPromptPayCharge, createCardCharge, retrieveEvent)
+  - `POST /api/omise/charge` — สร้าง charge (PromptPay/Card) + บันทึก Payment
+  - `GET /api/omise/status` — poll payment status
+  - `POST /api/webhooks/omise` — re-fetch event → activate plan อัตโนมัติ
+  - `/pricing` PaymentModal — 3 tabs: PromptPay (auto), บัตร, โอนเอง (manual)
+  - Polling 5s/tick สูงสุด 3 นาที — auto-close modal เมื่อ plan activate
+  - QR download: manual (canvas.toDataURL) + Omise (fetch blob → download)
+  - Env: `OMISE_SECRET_KEY` + `OMISE_PUBLIC_KEY` + webhook URL
 - [x] **Plan System Phase 2 (Payment Flow)**:
   - `src/lib/promptpay.ts` — EMVCo PromptPay QR payload generator (CRC-16 CCITT)
   - `GET /api/payments/info` — คืน promptpayPhone จาก env (สำหรับ QR generation)
@@ -102,10 +133,10 @@ Phase 1 Plan System เสร็จแล้ว — รอ QA + Phase 2 (Payment
 
 เรียงตามลำดับความสำคัญ:
 
-1. **QA ใน Production** — ทดสอบ golden path บน mobile browser จริง (Android Chrome, iOS Safari)
-2. **ตั้งค่า PROMPTPAY_PHONE ใน Vercel** — `PROMPTPAY_PHONE=0812345678` เพื่อให้ QR code ใน /pricing ทำงาน
-3. **Phase 3: Omise automated payment** — webhook auto-activate (optional, ถ้า volume สูง)
-4. **ตั้งค่า ADMIN_EMAIL env var บน Vercel** — `ADMIN_EMAIL=vndn2518@gmail.com`
+1. **ตั้งค่า Omise env vars บน Vercel** — `OMISE_SECRET_KEY` + `OMISE_PUBLIC_KEY` (จาก Omise Dashboard → Settings → Keys)
+2. **ตั้งค่า Omise Webhook** — Omise Dashboard → Webhooks → เพิ่ม URL: `https://your-domain.vercel.app/api/webhooks/omise`
+3. **QA ใน Production** — ทดสอบ payment flow บน Test mode ก่อน (Omise test card: 4242 4242 4242 4242)
+4. **Switch Omise to Live mode** — เปลี่ยน `skey_test_` → `skey_` และ `pkey_test_` → `pkey_` เมื่อพร้อม
 3. ~~**Transfer UI**~~ ✅ เสร็จ
 4. ~~**Debt Tracking UI**~~ ✅ เสร็จ
 5. ~~**Account Management UI**~~ ✅ เสร็จ

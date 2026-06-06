@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
+import { createCommissionAfterPayment } from '@/lib/commission'
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL
 
@@ -42,6 +43,14 @@ export async function PATCH(
         data:  { plan: payment.plan, planExpiresAt },
       }),
     ])
+
+    // Create commission for referrer (fire-and-forget — non-blocking)
+    createCommissionAfterPayment({
+      id:     payment.id,
+      userId: payment.userId,
+      plan:   payment.plan,
+      months: payment.months,
+    }).catch((err) => console.error('Commission error:', err))
 
     return NextResponse.json(updatedPayment)
   } catch {

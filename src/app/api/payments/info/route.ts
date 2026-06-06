@@ -9,6 +9,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    promptpayPhone: process.env.PROMPTPAY_PHONE ?? null,
+    promptpayPhone:  process.env.PROMPTPAY_PHONE ?? null,
+    omisePublicKey:  process.env.OMISE_PUBLIC_KEY ?? null,
   })
 }

@@ -27,6 +27,18 @@ interface PendingPayment {
   id: string; plan: Plan; months: number; amount: number; method: string; createdAt: string
   user: { id: string; name: string; email: string; plan: Plan }
 }
+interface AdminCommission {
+  id: string; planCode: string; amount: number; status: string
+  holdUntil: string; createdAt: string
+  referrer: { name: string; email: string }
+  referral: { referred: { name: string; email: string } }
+}
+interface AdminPayout {
+  id: string; amount: number; paymentMethod: string
+  accountName: string; promptpayNumber: string | null; accountNumber: string | null
+  status: string; adminNote: string | null; createdAt: string
+  user: { name: string; email: string }
+}
 
 const EVENT_LABELS: Record<string, string> = {
   transaction_saved:    'บันทึกรายการ',
@@ -142,6 +154,9 @@ export default function AdminPage() {
   const [usersLoading,    setUsersLoading]    = useState(true)
   const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([])
   const [confirmingId,    setConfirmingId]    = useState<string | null>(null)
+  const [commissions,     setCommissions]     = useState<AdminCommission[]>([])
+  const [payoutRequests,  setPayoutRequests]  = useState<AdminPayout[]>([])
+  const [actioningId,     setActioningId]     = useState<string | null>(null)
 
   const loadPending = () => {
     fetch('/api/admin/payments')
@@ -168,6 +183,9 @@ export default function AdminPage() {
       .finally(() => setUsersLoading(false))
 
     loadPending()
+
+    fetch('/api/admin/referral/commissions').then(r => r.ok ? r.json() : []).then(setCommissions).catch(() => {})
+    fetch('/api/admin/referral/payouts').then(r => r.ok ? r.json() : []).then(setPayoutRequests).catch(() => {})
   }, [])
 
   const confirmPayment = async (payment: PendingPayment) => {
@@ -188,6 +206,59 @@ export default function AdminPage() {
   const rejectPayment = async (id: string) => {
     await fetch(`/api/admin/payments/${id}`, { method: 'DELETE' })
     loadPending()
+  }
+
+  const approveCommission = async (id: string) => {
+    setActioningId(id)
+    try {
+      const res = await fetch(`/api/admin/referral/commissions/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve' }),
+      })
+      if (res.ok) {
+        setCommissions(prev => prev.map(c => c.id === id ? { ...c, status: 'approved' } : c))
+      } else {
+        const d = await res.json()
+        alert(d.error ?? 'ไม่สำเร็จ')
+      }
+    } finally { setActioningId(null) }
+  }
+
+  const cancelCommission = async (id: string) => {
+    setActioningId(id)
+    try {
+      const res = await fetch(`/api/admin/referral/commissions/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel' }),
+      })
+      if (res.ok) setCommissions(prev => prev.map(c => c.id === id ? { ...c, status: 'canceled' } : c))
+    } finally { setActioningId(null) }
+  }
+
+  const payPayout = async (id: string) => {
+    const note = prompt('หมายเหตุ (เช่น โอน PromptPay แล้ว)')
+    if (note === null) return
+    setActioningId(id)
+    try {
+      const res = await fetch(`/api/admin/referral/payouts/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'pay', adminNote: note }),
+      })
+      if (res.ok) setPayoutRequests(prev => prev.map(p => p.id === id ? { ...p, status: 'paid', adminNote: note } : p))
+    } finally { setActioningId(null) }
+  }
+
+  const rejectPayout = async (id: string) => {
+    const note = prompt('เหตุผลที่ปฏิเสธ')
+    if (note === null) return
+    setActioningId(id)
+    try {
+      const res = await fetch(`/api/admin/referral/payouts/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject', adminNote: note }),
+      })
+      if (res.ok) setPayoutRequests(prev => prev.map(p => p.id === id ? { ...p, status: 'rejected', adminNote: note } : p))
+    } finally { setActioningId(null) }
   }
 
   if (loading) return <div className="p-8 text-center text-gray-500 text-sm">กำลังโหลด...</div>
@@ -362,7 +433,7 @@ export default function AdminPage() {
           {data.recentFeedback.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-4">ยังไม่มี Feedback</p>
           )}
-          {data.recentFeedback.map((fb) => (
+          {(data.recentFeedback ?? []).map((fb) => (
             <div key={fb.id} className="rounded-xl bg-white border border-gray-100 shadow-sm p-4">
               <div className="flex items-center gap-2 mb-1">
                 <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${
@@ -384,6 +455,115 @@ export default function AdminPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* ── Commissions ─────────────────────────────────── */}
+      <section>
+        <h2 className="text-sm font-semibold text-gray-600 mb-3">
+          คอมมิชชัน
+          {commissions.filter(c => c.status === 'pending').length > 0 && (
+            <span className="ml-2 inline-flex items-center justify-center h-5 px-1.5 rounded-full bg-amber-500 text-white text-xs font-bold">
+              {commissions.filter(c => c.status === 'pending').length} รอ
+            </span>
+          )}
+        </h2>
+        {commissions.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีคอมมิชชัน</p>
+        ) : (
+          <div className="space-y-2">
+            {commissions.map(c => {
+              const holdPassed = new Date() >= new Date(c.holdUntil)
+              const statusColor = c.status === 'pending' ? 'text-amber-600' : c.status === 'approved' ? 'text-green-600' : 'text-gray-400'
+              return (
+                <div key={c.id} className="rounded-xl bg-white border border-gray-100 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">฿{Number(c.amount).toLocaleString()} <span className="font-normal text-gray-400 text-xs">· {c.planCode}</span></p>
+                      <p className="text-xs text-gray-500 truncate">{c.referrer.name} → {c.referral.referred.name}</p>
+                      <p className={`text-xs mt-0.5 ${statusColor}`}>
+                        {c.status === 'pending' ? `Hold ถึง ${new Date(c.holdUntil).toLocaleDateString('th-TH')}${holdPassed ? ' ✓ พร้อม' : ''}` : c.status}
+                      </p>
+                    </div>
+                    {c.status === 'pending' && (
+                      <div className="flex gap-1.5 shrink-0">
+                        <button
+                          onClick={() => approveCommission(c.id)}
+                          disabled={actioningId === c.id || !holdPassed}
+                          title={!holdPassed ? 'Hold period ยังไม่ครบ' : ''}
+                          className="rounded-lg bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700 disabled:opacity-40"
+                        >
+                          อนุมัติ
+                        </button>
+                        <button
+                          onClick={() => cancelCommission(c.id)}
+                          disabled={actioningId === c.id}
+                          className="rounded-lg border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-40"
+                        >
+                          ยกเลิก
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ── Payout Requests ─────────────────────────────── */}
+      <section>
+        <h2 className="text-sm font-semibold text-gray-600 mb-3">
+          คำขอถอนเงิน
+          {payoutRequests.filter(p => p.status === 'requested').length > 0 && (
+            <span className="ml-2 inline-flex items-center justify-center h-5 px-1.5 rounded-full bg-red-500 text-white text-xs font-bold">
+              {payoutRequests.filter(p => p.status === 'requested').length} ใหม่
+            </span>
+          )}
+        </h2>
+        {payoutRequests.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">ยังไม่มีคำขอถอน</p>
+        ) : (
+          <div className="space-y-2">
+            {payoutRequests.map(p => (
+              <div key={p.id} className={`rounded-xl border p-3 ${p.status === 'requested' ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-100'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-800">฿{Number(p.amount).toLocaleString()}</p>
+                    <p className="text-xs text-gray-600">{p.user.name} · {p.user.email}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {p.accountName} · {p.paymentMethod === 'promptpay' ? `PromptPay ${p.promptpayNumber ?? ''}` : `บัญชี ${p.accountNumber ?? ''}`}
+                    </p>
+                    {p.adminNote && <p className="text-xs text-gray-400 mt-0.5">หมายเหตุ: {p.adminNote}</p>}
+                  </div>
+                  {['requested', 'processing'].includes(p.status) && (
+                    <div className="flex gap-1.5 shrink-0">
+                      <button
+                        onClick={() => payPayout(p.id)}
+                        disabled={actioningId === p.id}
+                        className="rounded-lg bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700 disabled:opacity-40"
+                      >
+                        โอนแล้ว
+                      </button>
+                      <button
+                        onClick={() => rejectPayout(p.id)}
+                        disabled={actioningId === p.id}
+                        className="rounded-lg border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-40"
+                      >
+                        ปฏิเสธ
+                      </button>
+                    </div>
+                  )}
+                  {!['requested', 'processing'].includes(p.status) && (
+                    <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${p.status === 'paid' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {p.status === 'paid' ? 'โอนแล้ว' : 'ปฏิเสธ'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )

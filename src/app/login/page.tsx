@@ -1,20 +1,31 @@
 'use client'
-import { useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 
 type Mode = 'login' | 'register'
 
-export default function LoginPage() {
-  const router  = useRouter()
-  const [mode,     setMode]     = useState<Mode>('login')
+function LoginForm() {
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+
+  const [mode,     setMode]     = useState<Mode>(searchParams.get('mode') === 'register' ? 'register' : 'login')
   const [name,     setName]     = useState('')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
+  const [refCode,  setRefCode]  = useState('')
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState<string | null>(null)
+
+  // Auto-fill referral code from localStorage (set by /ref/:code)
+  useEffect(() => {
+    if (mode !== 'register') return
+    const stored  = localStorage.getItem('ref_code')
+    const expires = Number(localStorage.getItem('ref_code_expires') ?? 0)
+    if (stored && Date.now() < expires) setRefCode(stored)
+  }, [mode])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,12 +37,15 @@ export default function LoginPage() {
         const res = await fetch('/api/auth/register', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ name, email, password }),
+          body:    JSON.stringify({ name, email, password, refCode: refCode.trim() || undefined }),
         })
         if (!res.ok) {
           const body = await res.json()
           throw new Error(typeof body.error === 'string' ? body.error : 'สมัครไม่สำเร็จ')
         }
+        // Clear referral code from storage after successful registration
+        localStorage.removeItem('ref_code')
+        localStorage.removeItem('ref_code_expires')
       }
 
       const result = await signIn('credentials', { email, password, redirect: false })
@@ -89,6 +103,15 @@ export default function LoginPage() {
             placeholder={mode === 'register' ? 'อย่างน้อย 6 ตัวอักษร' : '••••••••'}
             required />
 
+          {mode === 'register' && (
+            <Input
+              label="รหัสแนะนำ (ถ้ามี)"
+              value={refCode}
+              onChange={(e) => setRefCode(e.target.value.toUpperCase())}
+              placeholder="เช่น WINIT001"
+            />
+          )}
+
           {error && (
             <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-700">
               {error}
@@ -101,5 +124,13 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   )
 }

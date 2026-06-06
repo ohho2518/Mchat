@@ -6,6 +6,56 @@
 
 ## 2026-06-06
 
+### Features — Referral & Affiliate System Phase 4–5 (User Dashboard + Admin Management)
+
+- Added: **`/referral` page** — Referral dashboard สำหรับผู้ใช้
+  - กล่อง referral code สีฟ้า + ปุ่ม Copy, แชร์ LINE, แชร์ Facebook
+  - Stats grid: ลิงก์ถูกคลิก / สมัครสมาชิก / ชำระเงิน / คอมมิชชันรอรับ
+  - กล่อง "ยอดพร้อมถอน" พร้อมปุ่ม "ขอถอนเงิน" (minimum ฿300)
+  - ฟอร์มถอนเงิน: PromptPay / บัญชีธนาคาร, mask account number
+  - ประวัติคำขอถอน + ประวัติคอมมิชชันพร้อม holdUntil status badge
+- Added: **Referral APIs** (`/api/referral/*`)
+  - `GET /api/referral/code` — lazy-create referral code สำหรับผู้ใช้เดิม
+  - `GET /api/referral/stats` — สถิติ clicks / signups / conversions / commissions รวม
+  - `GET /api/referral/commissions` — ประวัติคอมมิชชันของ user
+  - `POST /api/referral/payout` — ส่งคำขอถอนเงิน (ตรวจสอบยอดขั้นต่ำ ฿300 + ไม่มี pending ค้างอยู่)
+  - `GET /api/referral/payout` — ประวัติคำขอถอน (masked account number)
+- Added: **Admin Referral Management APIs** (`/api/admin/referral/*`)
+  - `GET /api/admin/referral/commissions` — list all commissions พร้อม referrer + referred info
+  - `PATCH /api/admin/referral/commissions/[id]` — approve (ตรวจสอบ holdUntil 14 วัน) / cancel
+  - `GET /api/admin/referral/payouts` — list all payout requests
+  - `PATCH /api/admin/referral/payouts/[id]` — pay (mark commissions paid) / reject พร้อม adminNote
+- Updated: **`/admin` page** — เพิ่มส่วน Commissions + Payout Requests
+  - Commissions: แสดงรายการพร้อม holdUntil timer, ปุ่ม "อนุมัติ" (disable ถ้า hold ยังไม่ครบ) / "ยกเลิก"
+  - Payout Requests: แสดงยอด, ชื่อบัญชี, PromptPay/bank info, ปุ่ม "โอนแล้ว" / "ปฏิเสธ" + prompt adminNote
+  - Badge counter แจ้ง pending items
+
+### Files Changed
+`src/app/referral/page.tsx` (new), `src/app/api/referral/code/route.ts` (new), `src/app/api/referral/stats/route.ts` (new), `src/app/api/referral/commissions/route.ts` (new), `src/app/api/referral/payout/route.ts` (new), `src/app/api/admin/referral/commissions/route.ts` (new), `src/app/api/admin/referral/commissions/[id]/route.ts` (new), `src/app/api/admin/referral/payouts/route.ts` (new), `src/app/api/admin/referral/payouts/[id]/route.ts` (new), `src/app/admin/page.tsx`
+
+---
+
+### Features — Phase 3: Omise Automated Payment (PromptPay + Credit Card)
+
+- Added: **Omise integration** — ชำระเงินอัตโนมัติผ่าน Omise gateway (ไม่ต้องรอ admin confirm)
+- Added: `src/lib/omise.ts` — Omise Node.js client wrapper (createPromptPayCharge, createCardCharge, retrieveEvent)
+- Added: `POST /api/omise/charge` — สร้าง Omise charge (PromptPay หรือ Card) + บันทึก Payment record พร้อม omiseChargeId
+- Added: `GET /api/omise/status?paymentId=` — poll สถานะ payment (paid/pending)
+- Added: `POST /api/webhooks/omise` — webhook handler: re-fetch event จาก Omise API เพื่อยืนยัน → activate plan อัตโนมัติ
+- Updated: `GET /api/payments/info` — เพิ่ม `omisePublicKey` ใน response
+- Updated: `/pricing` page — PaymentModal มี 3 tabs: **PromptPay (Omise auto)** / **บัตร (Omise)** / **โอนเอง (manual)**
+  - PromptPay tab: กด "สร้าง QR" → QR image จาก Omise → polling 5s → auto-activate เมื่อชำระสำเร็จ
+  - บัตร tab: โหลด Omise.js → popup → tokenize บัตร → charge → auto-activate ทันที (synchronous)
+  - โอนเอง tab: manual PromptPay flow เดิม (admin confirm ภายใน 24 ชั่วโมง)
+- Added: QR Download button — บันทึก QR PromptPay เป็น PNG (ทั้ง Omise QR และ manual QR)
+- Updated: `.env.example` — เพิ่ม `OMISE_SECRET_KEY`, `OMISE_PUBLIC_KEY` + webhook URL guide
+- Webhook setup: ตั้งใน Omise Dashboard → Webhooks → `https://your-domain.vercel.app/api/webhooks/omise`
+
+### Files Changed
+`src/lib/omise.ts` (new), `src/app/api/omise/charge/route.ts` (new), `src/app/api/omise/status/route.ts` (new), `src/app/api/webhooks/omise/route.ts` (new), `src/app/api/payments/info/route.ts`, `src/app/pricing/page.tsx`, `.env.example`
+
+---
+
 ### Features — User Behavior Tracking + Feedback + OCR Learning Data
 
 - Added: **AppEvent model** — บันทึก event การใช้งาน (transaction_saved, transaction_rejected, voice_used, ocr_used, ocr_corrected, export_done, page_view)
