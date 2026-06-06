@@ -59,9 +59,9 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 เรียงตามลำดับความสำคัญ:
 
 1. **QA ใน Production** — ทดสอบ golden path บน mobile browser จริง (Android Chrome, iOS Safari)
-2. **Transfer UI** — เพิ่มหน้าโอนเงินระหว่างบัญชี (fromAccount → toAccount) และ history
-3. ~~**Debt Tracking UI**~~ ✅ เสร็จ — หน้า /debts เต็ม (tabs: เราเป็นหนี้/เขาเป็นหนี้/ชำระแล้ว, PaymentModal)
-4. ~~**Account Management UI**~~ ✅ เสร็จ — หน้า /accounts เต็ม (CRUD พร้อม AccountCard/AccountForm)
+2. ~~**Transfer UI**~~ ✅ เสร็จ — หน้า /transfers, TransferCard/TransferForm, API CRUD, linked from Settings
+3. ~~**Debt Tracking UI**~~ ✅ เสร็จ
+4. ~~**Account Management UI**~~ ✅ เสร็จ
 5. ~~**Parser improvement**~~ ✅ เสร็จ
 6. ~~**E2E tests**~~ ✅ เสร็จ
 
@@ -87,8 +87,7 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 
 ## Known Issues
 
-1. **Transfer UI ยังไม่มี** — schema มี Transfer model (fromAccountId, toAccountId) แต่ไม่มี CRUD UI  
-   ตอนนี้ type=transfer บันทึกได้จากแชท แต่ไม่มีหน้าจัดการแยกหรือ account pairing
+1. **Transfer จากแชท ≠ Transfer ใน /transfers** — Transaction type=transfer ที่บันทึกจากแชทไม่มี fromAccountId/toAccountId จึงไม่แสดงในหน้า /transfers (ต้องสร้างผ่านหน้า /transfers เท่านั้น)
 
 2. **Voice input บน iOS Safari**  
    Web Speech API บน iOS Safari มี behavior แตกต่างจาก Android Chrome เล็กน้อย  
