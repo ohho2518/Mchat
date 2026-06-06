@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Sarabun } from "next/font/google"
 import { Analytics } from "@vercel/analytics/react"
 import { AppShell } from "@/components/layout"
@@ -21,13 +21,14 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "MChat",
   },
+}
+
+export const viewport: Viewport = {
   themeColor: "#2563EB",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export default function RootLayout({
