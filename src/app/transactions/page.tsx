@@ -65,6 +65,13 @@ export default function TransactionsPage() {
 
   useEffect(() => { fetchTransactions(filter, 1) }, [filter, fetchTransactions])
 
+  // Re-fetch เมื่อ tab กลับมา focus (กลับจากหน้า chat หลังบันทึก)
+  useEffect(() => {
+    const onFocus = () => fetchTransactions(filter, 1)
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [filter, fetchTransactions])
+
   // ─── Edit ────────────────────────────────────────────────────────────────
   const handleSave = async (id: string, data: Partial<Transaction>) => {
     const res = await fetch(`/api/transactions/${id}`, {

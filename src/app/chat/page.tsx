@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ChatInput, ChatMessage, DateContextBar, ParsedTransactionCard } from '@/components/chat'
 import { TransactionForm } from '@/components/transactions'
 import { Spinner } from '@/components/ui'
@@ -24,6 +25,7 @@ const todayStr = () => format(new Date(), 'yyyy-MM-dd')
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function ChatPage() {
+  const router = useRouter()
   const [messages, setMessages] = useState<MessageItem[]>([
     {
       id: uid(),
@@ -113,6 +115,8 @@ export default function ChatPage() {
         text: `บันทึก${parsed.type === 'income' ? 'รายรับ' : parsed.type === 'expense' ? 'รายจ่าย' : 'รายการ'} ฿${parsed.amount?.toLocaleString('th-TH')} แล้ว ✓`,
         variant: 'success',
       }])
+      // Invalidate Next.js router cache so Transactions/Dashboard pages re-fetch on next visit
+      router.refresh()
     } catch {
       setMessages((prev) => [...prev, {
         id: uid(), role: 'system', text: 'บันทึกไม่สำเร็จ กรุณาลองใหม่', variant: 'error',
