@@ -22,10 +22,11 @@ model User {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  accounts     Account[]
-  categories   Category[]
-  transactions Transaction[]
-  debts        Debt[]
+  accounts       Account[]
+  categories     Category[]
+  transactions   Transaction[]
+  debts          Debt[]
+  transfers      Transfer[]
   appEvents      AppEvent[]
   feedbacks      Feedback[]
   ocrCorrections OcrCorrection[]
@@ -43,7 +44,9 @@ model Account {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user           User     @relation(fields: [userId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
+  outgoing  Transfer[] @relation("TransferFrom")
+  incoming  Transfer[] @relation("TransferTo")
 }
 
 // ─── Categories ───────────────────────────────────────────
@@ -94,6 +97,7 @@ model Transaction {
 
   user     User      @relation(fields: [userId], references: [id])
   category Category? @relation(fields: [categoryId], references: [id])
+  transfer Transfer?
 }
 
 // ─── App Events (Behavior Tracking) ──────────────────────
@@ -134,15 +138,20 @@ model OcrCorrection {
 // ─── Transfers ────────────────────────────────────────────
 // โอนเงินระหว่างบัญชี (ไม่นับเป็นรายรับ/รายจ่าย)
 model Transfer {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid())
   userId        String
   fromAccountId String
   toAccountId   String
-  transactionId String   @unique
-  amount        Decimal  @db.Decimal(18, 2)
-  transferDate  DateTime @db.Date
+  transactionId String      @unique
+  amount        Decimal     @db.Decimal(18, 2)
+  transferDate  DateTime    @db.Date
   description   String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime    @default(now())
+
+  user          User        @relation(fields: [userId], references: [id])
+  fromAccount   Account     @relation("TransferFrom", fields: [fromAccountId], references: [id])
+  toAccount     Account     @relation("TransferTo",   fields: [toAccountId],   references: [id])
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
 }
 
 // ─── Debts ────────────────────────────────────────────────

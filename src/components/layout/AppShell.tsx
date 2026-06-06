@@ -7,13 +7,15 @@ import { PageTracker } from './PageTracker'
 import { FeedbackButton } from '@/components/ui/FeedbackButton'
 
 const PAGE_TITLES: Record<string, string> = {
-  '/chat': 'MChat',
-  '/dashboard': 'รายงาน',
+  '/chat':        'MChat',
+  '/dashboard':   'รายงาน',
   '/transactions': 'รายการ',
-  '/categories': 'หมวดหมู่',
-  '/accounts': 'บัญชีของฉัน',
-  '/debts':    'หนี้สิน',
-  '/settings': 'ตั้งค่า',
+  '/categories':  'หมวดหมู่',
+  '/accounts':    'บัญชีของฉัน',
+  '/debts':       'หนี้สิน',
+  '/transfers':   'โอนเงิน',
+  '/settings':    'ตั้งค่า',
+  '/admin':       'Analytics',
 }
 
 const NO_SHELL = ['/login']

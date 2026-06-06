@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { LogOut, Pencil, X, Check, Info, Download, Wallet, Tag, ChevronRight, HandCoins, BarChart2 } from 'lucide-react'
+import { LogOut, Pencil, X, Check, Info, Download, Wallet, Tag, ChevronRight, HandCoins, BarChart2, ArrowLeftRight } from 'lucide-react'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -241,6 +241,11 @@ export default function SettingsPage() {
           <Link href="/debts" className="flex items-center gap-3 py-2.5 text-sm text-gray-700 hover:text-blue-600 transition-colors">
             <HandCoins className="h-4 w-4 text-gray-400" />
             <span className="flex-1">หนี้สิน</span>
+            <ChevronRight className="h-4 w-4 text-gray-300" />
+          </Link>
+          <Link href="/transfers" className="flex items-center gap-3 py-2.5 text-sm text-gray-700 hover:text-blue-600 transition-colors">
+            <ArrowLeftRight className="h-4 w-4 text-gray-400" />
+            <span className="flex-1">โอนเงินระหว่างบัญชี</span>
             <ChevronRight className="h-4 w-4 text-gray-300" />
           </Link>
         </div>
