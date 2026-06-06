@@ -59,9 +59,11 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 เรียงตามลำดับความสำคัญ:
 
 1. **QA ใน Production** — ทดสอบ golden path บน mobile browser จริง (Android Chrome, iOS Safari)
-2. **Debt Tracking UI** — schema มี `Debt` model แต่ยังไม่มีหน้าติดตามลูกหนี้/เจ้าหนี้
-3. ~~**Parser improvement**~~ ✅ เสร็จ — แก้ bugs date-before-amount, Thai word numbers (พัน/หมื่น/แสน/ล้าน), เพิ่ม categories (ค่าโทรศัพท์, ค่าเช่า, เงินเดือน), 41/41 tests pass
-4. ~~**E2E tests**~~ ✅ เสร็จ — Playwright setup พร้อม global-setup, auth.spec, chat.spec, navigation.spec (19 tests)
+2. **Transfer UI** — เพิ่มหน้าโอนเงินระหว่างบัญชี (fromAccount → toAccount) และ history
+3. ~~**Debt Tracking UI**~~ ✅ เสร็จ — หน้า /debts เต็ม (tabs: เราเป็นหนี้/เขาเป็นหนี้/ชำระแล้ว, PaymentModal)
+4. ~~**Account Management UI**~~ ✅ เสร็จ — หน้า /accounts เต็ม (CRUD พร้อม AccountCard/AccountForm)
+5. ~~**Parser improvement**~~ ✅ เสร็จ
+6. ~~**E2E tests**~~ ✅ เสร็จ
 
 ---
 
@@ -85,15 +87,14 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 
 ## Known Issues
 
-1. **Account/Transfer/Debt models ยังไม่มี UI**  
-   Schema มี model เหล่านี้ครบ แต่ไม่มี API routes หรือ UI component รองรับ  
-   Transaction ที่ type=transfer/debt บันทึกได้แต่ไม่มีหน้าจัดการแยก
+1. **Transfer UI ยังไม่มี** — schema มี Transfer model (fromAccountId, toAccountId) แต่ไม่มี CRUD UI  
+   ตอนนี้ type=transfer บันทึกได้จากแชท แต่ไม่มีหน้าจัดการแยกหรือ account pairing
 
-3. **Voice input บน iOS Safari**  
+2. **Voice input บน iOS Safari**  
    Web Speech API บน iOS Safari มี behavior แตกต่างจาก Android Chrome เล็กน้อย  
    ควรทดสอบ 4s silence timeout บนอุปกรณ์จริง
 
-4. **Parser: "ขาย" keyword**  
+3. **Parser: "ขาย" keyword**  
    บางประโยคที่ไม่มี context ชัดเจนอาจถูก detect เป็น income หรือ expense ไม่ถูกต้อง  
    → confidence < 0.6 จะแสดง warning ให้ผู้ใช้ยืนยัน
 
@@ -115,7 +116,8 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 
 ## Need Confirmation
 
-1. ต้องการให้เพิ่ม Account management UI ไหม? (เลือกบัญชีตอนบันทึก transaction)
-2. ต้องการหน้าติดตาม Debt (ลูกหนี้/เจ้าหนี้) แยกต่างหากไหม?
-3. ✅ Production domain ยืนยันแล้ว: `https://mchat-git-main-vinit-deekhanu-s-projects.vercel.app` — ตั้ง `NEXTAUTH_URL` นี้ใน Vercel env vars
-4. ต้องการ analytics หรือ crash monitoring ไหม? (Sentry, Vercel Analytics ฯลฯ)
+1. ✅ Account management UI — เสร็จ (/accounts, linked from Settings)
+2. ✅ Debt Tracking UI — เสร็จ (/debts, linked from Settings)
+3. ✅ Production domain ยืนยันแล้ว: `https://mchat-git-main-vinit-deekhanu-s-projects.vercel.app`
+4. ✅ Analytics — เสร็จ (/admin สำหรับ admin, Vercel Analytics ติดแล้วใน layout.tsx)
+5. **Transfer UI** — ต้องการหรือไม่? (โอนเงินระหว่างบัญชี เชื่อม fromAccount/toAccount)
