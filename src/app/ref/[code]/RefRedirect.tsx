@@ -14,7 +14,7 @@ export function RefRedirect({ code }: { code: string }) {
     // Record click (fire-and-forget)
     fetch(`/api/ref/click?code=${code}`, { method: 'POST' }).catch(() => {})
 
-    router.push('/login?mode=register')
+    router.push('/download')
   }, [code, router])
 
   return (
