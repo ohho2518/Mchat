@@ -60,7 +60,7 @@ export function FeedbackButton() {
 
       {/* Backdrop + Modal */}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center px-4 pb-4 sm:items-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/40" onClick={close} />
           <div className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
             {/* Header */}
