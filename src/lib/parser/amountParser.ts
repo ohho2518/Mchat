@@ -9,32 +9,38 @@ const THAI_DIGIT_WORDS: Array<[string, number]> = [
 // multiplier units in descending order
 const UNIT_MAP: Array<[string, number]> = [
   ['ล้าน', 1_000_000],
-  ['แสน', 100_000],
-  ['หมื่น', 10_000],
-  ['พัน', 1_000],
+  ['แสน',    100_000],
+  ['หมื่น',   10_000],
+  ['พัน',      1_000],
+  ['ร้อย',       100],
 ]
 
 function tryThaiWordAmount(text: string): number | null {
+  let total = 0
+
   for (const [unit, mult] of UNIT_MAP) {
     if (!text.includes(unit)) continue
 
     // "3พัน", "12 พัน"
     const digitMatch = text.match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*${unit}`))
-    if (digitMatch) return parseFloat(digitMatch[1]) * mult
+    if (digitMatch) { total += parseFloat(digitMatch[1]) * mult; continue }
 
     // "สองพัน", "หนึ่งหมื่น"
+    let wordMatched = false
     for (const [word, val] of THAI_DIGIT_WORDS) {
-      if (text.includes(word + unit)) return val * mult
+      if (text.includes(word + unit)) { total += val * mult; wordMatched = true; break }
     }
+    if (wordMatched) continue
 
     // bare unit with no digit/word before it ("ยืมพัน" = 1000)
     const idx = text.indexOf(unit)
     const before = text.slice(0, idx)
     if (!before.match(/[\d]$/) && !THAI_DIGIT_WORDS.some(([w]) => before.endsWith(w))) {
-      return mult
+      total += mult
     }
   }
-  return null
+
+  return total > 0 ? total : null
 }
 
 export function extractAmount(text: string): number | null {

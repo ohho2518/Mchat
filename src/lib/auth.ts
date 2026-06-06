@@ -31,8 +31,8 @@ export const authOptions: NextAuthOptions = {
     jwt({ token, user, trigger, session: updateData }) {
       if (user) token.userId = user.id
       // Handle update() call from client — update name in JWT token
-      if (trigger === 'update' && updateData?.name) {
-        token.name = updateData.name
+      if (trigger === 'update' && typeof updateData?.name === 'string') {
+        token.name = updateData.name.trim().slice(0, 50)
       }
       return token
     },

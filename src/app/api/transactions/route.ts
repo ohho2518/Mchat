@@ -25,8 +25,12 @@ export async function GET(req: Request) {
       status: { not: 'deleted' as const },
       ...(type        && { type }),
       ...(categoryId  && { categoryId }),
-      ...(startDate   && { transactionDate: { gte: new Date(startDate) } }),
-      ...(endDate     && { transactionDate: { lte: new Date(endDate) } }),
+      ...((startDate || endDate) && {
+        transactionDate: {
+          ...(startDate && { gte: new Date(startDate) }),
+          ...(endDate   && { lte: new Date(endDate) }),
+        },
+      }),
       ...(keyword     && {
         OR: [
           { description: { contains: keyword, mode: 'insensitive' as const } },

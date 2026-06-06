@@ -15,43 +15,47 @@ const UpdateProfileSchema = z.object({
 )
 
 export async function PATCH(req: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const body = await req.json()
-  const parsed = UpdateProfileSchema.safeParse(body)
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
-  }
-
-  const { name, currentPassword, newPassword } = parsed.data
-  const updates: Record<string, unknown> = {}
-
-  if (name) updates.name = name
-
-  if (newPassword) {
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } })
-    if (!user?.passwordHash) {
-      return NextResponse.json({ error: 'ไม่พบข้อมูลผู้ใช้' }, { status: 404 })
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const valid = await verifyPassword(currentPassword!, user.passwordHash)
-    if (!valid) {
-      return NextResponse.json({ error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' }, { status: 400 })
+
+    const body = await req.json()
+    const parsed = UpdateProfileSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
     }
-    updates.passwordHash = await hashPassword(newPassword)
+
+    const { name, currentPassword, newPassword } = parsed.data
+    const updates: Record<string, unknown> = {}
+
+    if (name) updates.name = name
+
+    if (newPassword) {
+      const user = await prisma.user.findUnique({ where: { id: session.user.id } })
+      if (!user?.passwordHash) {
+        return NextResponse.json({ error: 'ไม่พบข้อมูลผู้ใช้' }, { status: 404 })
+      }
+      const valid = await verifyPassword(currentPassword!, user.passwordHash)
+      if (!valid) {
+        return NextResponse.json({ error: 'รหัสผ่านปัจจุบันไม่ถูกต้อง' }, { status: 400 })
+      }
+      updates.passwordHash = await hashPassword(newPassword)
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'ไม่มีข้อมูลที่ต้องการอัปเดต' }, { status: 400 })
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: session.user.id },
+      data: updates,
+      select: { id: true, name: true, email: true },
+    })
+
+    return NextResponse.json(updated)
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ error: 'ไม่มีข้อมูลที่ต้องการอัปเดต' }, { status: 400 })
-  }
-
-  const updated = await prisma.user.update({
-    where: { id: session.user.id },
-    data: updates,
-    select: { id: true, name: true, email: true },
-  })
-
-  return NextResponse.json(updated)
 }

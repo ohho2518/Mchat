@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'vndn2518@gmail.com'
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL
 
 export async function GET() {
   try {
@@ -12,8 +12,8 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Only admin can access
-    if (session.user.email !== ADMIN_EMAIL) {
+    // Only admin can access — fails closed if ADMIN_EMAIL env var is not set
+    if (!ADMIN_EMAIL || session.user.email !== ADMIN_EMAIL) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

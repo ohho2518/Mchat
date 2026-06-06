@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { unstable_cache } from 'next/cache'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
 import type { DashboardSummary } from '@/types/dashboard'
+
+const TH_OFFSET_MS = 7 * 60 * 60 * 1000  // UTC+7, Thai Standard Time (no DST)
 
 function toNumber(val: unknown): number {
   return Number(val) || 0
@@ -12,19 +15,19 @@ function sumByType(rows: { type: string; _sum: { amount: unknown } }[], type: st
   return toNumber(rows.find((r) => r.type === type)?._sum?.amount)
 }
 
-export async function GET() {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+const getCachedSummary = unstable_cache(
+  async (userId: string): Promise<DashboardSummary> => {
+    // Shift current UTC time to Thai local time, then read date components in UTC
+    // to get the correct Thai calendar date without DST ambiguity
+    const nowTh = new Date(Date.now() + TH_OFFSET_MS)
+    const y = nowTh.getUTCFullYear()
+    const m = nowTh.getUTCMonth()
+    const d = nowTh.getUTCDate()
 
-    const userId = session.user.id
-    const now    = new Date()
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const todayEnd   = new Date(todayStart.getTime() + 86400000 - 1)
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+    const todayStart = new Date(Date.UTC(y, m, d))
+    const todayEnd   = new Date(Date.UTC(y, m, d + 1) - 1)
+    const monthStart = new Date(Date.UTC(y, m, 1))
+    const monthEnd   = new Date(Date.UTC(y, m + 1, 1) - 1)
 
     const baseWhere = {
       userId,
@@ -45,12 +48,12 @@ export async function GET() {
       }),
     ])
 
-    const incomeToday   = sumByType(todayRows,  'income')
-    const expenseToday  = sumByType(todayRows,  'expense')
-    const incomeMonth   = sumByType(monthRows,  'income')
-    const expenseMonth  = sumByType(monthRows,  'expense')
+    const incomeToday  = sumByType(todayRows, 'income')
+    const expenseToday = sumByType(todayRows, 'expense')
+    const incomeMonth  = sumByType(monthRows, 'income')
+    const expenseMonth = sumByType(monthRows, 'expense')
 
-    const summary: DashboardSummary = {
+    return {
       incomeToday,
       expenseToday,
       balanceToday:  incomeToday  - expenseToday,
@@ -58,7 +61,19 @@ export async function GET() {
       expenseMonth,
       balanceMonth:  incomeMonth  - expenseMonth,
     }
+  },
+  ['dashboard-summary'],
+  { revalidate: 60 }
+)
 
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const summary = await getCachedSummary(session.user.id)
     return NextResponse.json(summary)
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-2026-06-06
+2026-06-06 (EOD — security & bug fix pass)
 
 ---
 
@@ -15,7 +15,8 @@ MVP สมบูรณ์แล้ว — ขั้นตอนถัดไป�
 ## Current State
 
 **Production-ready MVP.** ทุก Phase (0–7) เสร็จสมบูรณ์และ deploy บน Vercel + Supabase แล้ว  
-Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน Android/iOS, Voice input ทำงานบน Chrome/Safari/Edge
+Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน Android/iOS, Voice input ทำงานบน Chrome/Safari/Edge  
+ผ่าน security & bug fix pass (15 issues จาก code review — Critical/High/Medium ทั้งหมดแก้แล้ว)
 
 ---
 
@@ -45,6 +46,19 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 - [x] **User Feedback** — Feedback model, POST /api/feedback, FeedbackButton floating ล่างขวา (ดาว 1-5 + ประเภท + ข้อความ)
 - [x] **Admin Analytics** — GET /api/admin/analytics, หน้า /admin (events, daily chart, top users, OCR stats, feedbacks)
 - [x] **OCR Correction + Learning Data** — OcrReviewModal ให้ user แก้ข้อความ OCR ก่อน submit, บันทึก correction ลง OcrCorrection table, GET /api/ocr-corrections สำหรับ admin export
+- [x] **Transfer UI** — หน้า /transfers, TransferCard/TransferForm, API CRUD (/api/transfers, /api/transfers/[id]), linked from Settings
+- [x] **Security & Bug Fix Pass (15 issues)** — Critical/High/Medium ทั้งหมดแก้แล้ว:
+  - Bug: date range filter ใน transactions API (startDate+endDate spread overwrite กัน)
+  - Security: OCR rate limiting (10 req/min/user), mimeType allowlist, base64 size limit (20 MB), fetch timeout (20s)
+  - Security: Register email validation (`z.string().email()`), IP rate limiting (5 req/min)
+  - Bug: `api/user` PATCH ขาด try/catch — เพิ่มแล้ว
+  - Security: JWT name update ตอน trigger=update — validate type + slice(0,50)
+  - Perf: dashboard/summary ครอบด้วย unstable_cache (TTL 60s per userId)
+  - Bug: "today" คำนวณผิด timezone — แก้เป็น UTC+7 (Thai Standard Time)
+  - Bug: Parser ขาด `ร้อย` (100) — เพิ่มใน UNIT_MAP + refactor accumulate compound numbers ("สองพันห้าร้อย" = 2500)
+  - Bug: Transfer account ownership check อยู่นอก $transaction (TOCTOU) — ย้ายเข้าใน
+  - Security: scrypt N upgrade 16384→65536, เก็บ N ใน hash format (backward-compat legacy)
+  - Security: admin analytics ลบ hardcoded fallback email ออก (fail-closed ถ้าไม่ set ADMIN_EMAIL env)
 
 ---
 
@@ -59,11 +73,13 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 เรียงตามลำดับความสำคัญ:
 
 1. **QA ใน Production** — ทดสอบ golden path บน mobile browser จริง (Android Chrome, iOS Safari)
-2. ~~**Transfer UI**~~ ✅ เสร็จ — หน้า /transfers, TransferCard/TransferForm, API CRUD, linked from Settings
-3. ~~**Debt Tracking UI**~~ ✅ เสร็จ
-4. ~~**Account Management UI**~~ ✅ เสร็จ
-5. ~~**Parser improvement**~~ ✅ เสร็จ
-6. ~~**E2E tests**~~ ✅ เสร็จ
+2. **ตั้งค่า ADMIN_EMAIL env var บน Vercel** — `ADMIN_EMAIL=vndn2518@gmail.com` (จำเป็น หลังจากลบ hardcode fallback)
+3. ~~**Transfer UI**~~ ✅ เสร็จ
+4. ~~**Debt Tracking UI**~~ ✅ เสร็จ
+5. ~~**Account Management UI**~~ ✅ เสร็จ
+6. ~~**Parser improvement**~~ ✅ เสร็จ
+7. ~~**E2E tests**~~ ✅ เสร็จ
+8. ~~**Security & Bug Fix Pass**~~ ✅ เสร็จ
 
 ---
 
@@ -110,6 +126,8 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 | Confirm before save (ทุกครั้ง) | ผู้ใช้ต้องรู้ว่าระบบ parse ถูกก่อนบันทึก |
 | PWA แทน Native App | ลด friction การติดตั้ง; รองรับทุก platform ด้วย codebase เดียว |
 | Prisma v6 + Next.js 16 | เวอร์ชันล่าสุดตอน init โปรเจกต์ |
+| scrypt N:salt:hash format | เก็บ cost factor ไว้ใน hash string เพื่อ backward-compat เมื่อ upgrade N ในอนาคต |
+| In-memory rate limiting (Map) | ไม่ต้องการ Redis สำหรับ scale ปัจจุบัน; per-instance แต่เพียงพอสำหรับ personal app |
 
 ---
 
@@ -119,4 +137,4 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 2. ✅ Debt Tracking UI — เสร็จ (/debts, linked from Settings)
 3. ✅ Production domain ยืนยันแล้ว: `https://mchat-git-main-vinit-deekhanu-s-projects.vercel.app`
 4. ✅ Analytics — เสร็จ (/admin สำหรับ admin, Vercel Analytics ติดแล้วใน layout.tsx)
-5. **Transfer UI** — ต้องการหรือไม่? (โอนเงินระหว่างบัญชี เชื่อม fromAccount/toAccount)
+5. ✅ Transfer UI — เสร็จ (/transfers, linked from Settings)

@@ -49,16 +49,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'บัญชีต้นทางและปลายทางต้องไม่เหมือนกัน' }, { status: 400 })
     }
 
-    // ตรวจว่าบัญชีทั้งสองเป็นของ user
-    const [fromAcc, toAcc] = await Promise.all([
-      prisma.account.findFirst({ where: { id: fromAccountId, userId: session.user.id, isActive: true } }),
-      prisma.account.findFirst({ where: { id: toAccountId,   userId: session.user.id, isActive: true } }),
-    ])
-    if (!fromAcc || !toAcc) {
-      return NextResponse.json({ error: 'บัญชีไม่ถูกต้อง' }, { status: 400 })
-    }
-
     const result = await prisma.$transaction(async (tx) => {
+      // ตรวจว่าบัญชีทั้งสองเป็นของ user ภายใน transaction เพื่อป้องกัน race condition
+      const [fromAcc, toAcc] = await Promise.all([
+        tx.account.findFirst({ where: { id: fromAccountId, userId: session.user.id, isActive: true } }),
+        tx.account.findFirst({ where: { id: toAccountId,   userId: session.user.id, isActive: true } }),
+      ])
+      if (!fromAcc || !toAcc) throw new Error('INVALID_ACCOUNT')
+
       const desc = description || `โอนจาก${fromAcc.name}ไป${toAcc.name}`
       const txn = await tx.transaction.create({
         data: {
@@ -96,7 +94,10 @@ export async function POST(req: Request) {
       amount:       Number(result.amount),
       transferDate: format(result.transferDate, 'yyyy-MM-dd'),
     }, { status: 201 })
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.message === 'INVALID_ACCOUNT') {
+      return NextResponse.json({ error: 'บัญชีไม่ถูกต้อง' }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -3,6 +3,23 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
 
+const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+const MAX_B64_LEN  = 20 * 1024 * 1024  // ~15 MB original after base64 inflation
+
+// 10 OCR calls per 60 s per user (per serverless instance)
+const ocrRateMap = new Map<string, { count: number; resetAt: number }>()
+function checkOcrRate(userId: string): boolean {
+  const now = Date.now()
+  const entry = ocrRateMap.get(userId)
+  if (!entry || entry.resetAt < now) {
+    ocrRateMap.set(userId, { count: 1, resetAt: now + 60_000 })
+    return true
+  }
+  if (entry.count >= 10) return false
+  entry.count++
+  return true
+}
+
 const BASE_PROMPT = `คุณคือผู้ช่วยอ่านสลิปธนาคาร บิล และใบเสร็จภาษาไทย
 
 ดูรูปภาพนี้แล้วตอบเป็น JSON ตามรูปแบบนี้เท่านั้น:
@@ -72,6 +89,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (!checkOcrRate(session.user.id)) {
+      return NextResponse.json({ error: 'ส่งรูปเร็วเกินไป กรุณารอสักครู่' }, { status: 429 })
+    }
+
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
       return NextResponse.json({ error: 'OCR ไม่พร้อมใช้งาน (ไม่มี OPENAI_API_KEY)' }, { status: 503 })
@@ -83,8 +104,14 @@ export async function POST(req: Request) {
       mimeType?: string
     }
 
-    if (!imageBase64) {
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
       return NextResponse.json({ error: 'ไม่พบรูปภาพ' }, { status: 400 })
+    }
+    if (imageBase64.length > MAX_B64_LEN) {
+      return NextResponse.json({ error: 'รูปภาพมีขนาดใหญ่เกินไป' }, { status: 413 })
+    }
+    if (!ALLOWED_MIME.has(mimeType)) {
+      return NextResponse.json({ error: 'ประเภทไฟล์ไม่รองรับ' }, { status: 400 })
     }
 
     // Fetch user's account names for sender/receiver matching (fail gracefully)
@@ -101,6 +128,7 @@ export async function POST(req: Request) {
     const prompt = buildPrompt(accountNames)
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      signal: AbortSignal.timeout(20_000),
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -156,6 +184,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ text, holderName })
   } catch (err) {
+    if (err instanceof Error && err.name === 'TimeoutError') {
+      return NextResponse.json({ error: 'OCR ใช้เวลานานเกินไป กรุณาลองใหม่' }, { status: 504 })
+    }
     console.error('[OCR] Unhandled error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
