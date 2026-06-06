@@ -287,3 +287,10 @@ model Payment {
 
   user          User          @relation(fields: [userId], references: [id])
 }
+
+// ─── Site Settings ────────────────────────────────────────
+model SiteSetting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}

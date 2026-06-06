@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 interface HeaderProps {
   title: string
   userName?: string
@@ -18,8 +20,16 @@ export function Header({ title, userName }: HeaderProps) {
           <h1 className="text-lg font-semibold text-gray-900">{title}</h1>
         )}
         {initial && (
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-            {initial}
+          <div className="flex items-center gap-2">
+            <Link
+              href="/referral"
+              className="flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+            >
+              💰 แนะนำเพื่อน
+            </Link>
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+              {initial}
+            </div>
           </div>
         )}
       </div>

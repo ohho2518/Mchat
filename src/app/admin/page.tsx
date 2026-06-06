@@ -157,6 +157,9 @@ export default function AdminPage() {
   const [commissions,     setCommissions]     = useState<AdminCommission[]>([])
   const [payoutRequests,  setPayoutRequests]  = useState<AdminPayout[]>([])
   const [actioningId,     setActioningId]     = useState<string | null>(null)
+  const [terms,           setTerms]           = useState<any>(null)
+  const [termsLoading,    setTermsLoading]    = useState(false)
+  const [termsSaved,      setTermsSaved]      = useState(false)
 
   const loadPending = () => {
     fetch('/api/admin/payments')
@@ -186,6 +189,7 @@ export default function AdminPage() {
 
     fetch('/api/admin/referral/commissions').then(r => r.ok ? r.json() : []).then(setCommissions).catch(() => {})
     fetch('/api/admin/referral/payouts').then(r => r.ok ? r.json() : []).then(setPayoutRequests).catch(() => {})
+    fetch('/api/admin/settings').then(r => r.ok ? r.json() : null).then(setTerms).catch(() => {})
   }, [])
 
   const confirmPayment = async (payment: PendingPayment) => {
@@ -259,6 +263,18 @@ export default function AdminPage() {
       })
       if (res.ok) setPayoutRequests(prev => prev.map(p => p.id === id ? { ...p, status: 'rejected', adminNote: note } : p))
     } finally { setActioningId(null) }
+  }
+
+  const saveTerms = async () => {
+    if (!terms) return
+    setTermsLoading(true)
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(terms),
+      })
+      if (res.ok) { setTermsSaved(true); setTimeout(() => setTermsSaved(false), 2000) }
+    } finally { setTermsLoading(false) }
   }
 
   if (loading) return <div className="p-8 text-center text-gray-500 text-sm">กำลังโหลด...</div>
@@ -510,6 +526,80 @@ export default function AdminPage() {
           </div>
         )}
       </section>
+
+      {/* ── Referral Terms Editor ───────────────────────── */}
+      {terms && (
+        <section>
+          <h2 className="text-sm font-semibold text-gray-600 mb-3">เงื่อนไข Referral (แสดงบน Landing Page)</h2>
+          <div className="rounded-xl bg-white border border-gray-100 p-4 space-y-4">
+            {/* Commission rows */}
+            <div>
+              <p className="text-xs font-medium text-gray-500 mb-2">อัตราค่าแนะนำ (฿)</p>
+              <div className="space-y-2">
+                {(terms.commissions as any[]).map((c: any, i: number) => (
+                  <div key={c.code} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-600 w-32 shrink-0">{c.plan}</span>
+                    <input
+                      type="number" min={0} value={c.amount}
+                      onChange={e => {
+                        const next = [...terms.commissions]
+                        next[i] = { ...c, amount: Number(e.target.value) }
+                        setTerms({ ...terms, commissions: next })
+                      }}
+                      className="w-24 rounded-lg border border-gray-200 px-2 py-1 text-sm text-right"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Rules */}
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs text-gray-500">Hold (วัน)</label>
+                <input type="number" min={1} value={terms.holdDays}
+                  onChange={e => setTerms({ ...terms, holdDays: Number(e.target.value) })}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm text-center"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">ถอนขั้นต่ำ (฿)</label>
+                <input type="number" min={1} value={terms.minPayout}
+                  onChange={e => setTerms({ ...terms, minPayout: Number(e.target.value) })}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm text-center"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">วันจ่าย (วันที่)</label>
+                <input type="number" min={1} max={28} value={terms.payoutDay}
+                  onChange={e => setTerms({ ...terms, payoutDay: Number(e.target.value) })}
+                  className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm text-center"
+                />
+              </div>
+            </div>
+
+            {/* Extra note */}
+            <div>
+              <label className="text-xs text-gray-500">หมายเหตุเพิ่มเติม (แสดงท้าย)</label>
+              <textarea
+                rows={2} value={terms.extraNote ?? ''}
+                onChange={e => setTerms({ ...terms, extraNote: e.target.value })}
+                placeholder="เช่น บริษัทขอสงวนสิทธิ์..."
+                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none"
+              />
+            </div>
+
+            <button
+              onClick={saveTerms} disabled={termsLoading}
+              className={`w-full rounded-xl py-2.5 text-sm font-semibold text-white transition-colors ${
+                termsSaved ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'
+              } disabled:opacity-50`}
+            >
+              {termsSaved ? '✓ บันทึกแล้ว' : termsLoading ? 'กำลังบันทึก...' : 'บันทึกเงื่อนไข'}
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* ── Payout Requests ─────────────────────────────── */}
       <section>
