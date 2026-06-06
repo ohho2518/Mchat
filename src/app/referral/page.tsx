@@ -1,8 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { Copy, Check, Users, TrendingUp, Clock, Wallet, Share2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
+import { Copy, Check, Users, TrendingUp, Clock, Wallet, Share2, Download } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { PARTNER_LEVEL_LABELS } from '@/lib/referral'
+
+const QRCodeCanvas = dynamic(() => import('qrcode.react').then(m => m.QRCodeCanvas), { ssr: false })
 
 interface Stats {
   code:               string | null
@@ -72,6 +75,7 @@ export default function ReferralPage() {
   const [payouts,     setPayouts]     = useState<PayoutReq[]>([])
   const [loading,     setLoading]     = useState(true)
   const [copied,      setCopied]      = useState(false)
+  const qrWrapRef = useRef<HTMLDivElement>(null)
 
   // Payout form
   const [showPayout,   setShowPayout]   = useState(false)
@@ -113,6 +117,15 @@ export default function ReferralPage() {
 
   const shareFacebook = () => {
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`, '_blank')
+  }
+
+  const downloadQR = () => {
+    const canvas = qrWrapRef.current?.querySelector('canvas')
+    if (!canvas) return
+    const a = document.createElement('a')
+    a.href = canvas.toDataURL('image/png')
+    a.download = `mchat-referral-${stats?.code ?? 'qr'}.png`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
 
   const submitPayout = async (e: React.FormEvent) => {
@@ -162,6 +175,20 @@ export default function ReferralPage() {
           <p className="text-xs opacity-80">รหัสแนะนำของคุณ</p>
           <p className="text-3xl font-bold tracking-widest">{stats.code}</p>
           <div className="text-xs opacity-70 break-all">{link}</div>
+
+          {/* QR Code */}
+          <div className="flex flex-col items-center gap-2">
+            <div ref={qrWrapRef} className="rounded-xl bg-white p-3">
+              <QRCodeCanvas value={link} size={180} />
+            </div>
+            <button
+              onClick={downloadQR}
+              className="flex items-center gap-1.5 rounded-xl bg-white/20 px-3 py-2 text-xs font-medium hover:bg-white/30"
+            >
+              <Download className="h-3.5 w-3.5" /> บันทึก QR
+            </button>
+          </div>
+
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={copyLink}
