@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-2026-06-05 (EOD)
+2026-06-06
 
 ---
 
@@ -38,6 +38,13 @@ Parser ผ่าน 25/25 test cases, PWA ติดตั้งได้บน A
 - [x] OCR Slip + holderName feature — อ่านสลิป/บิลด้วย GPT-4o-mini, ดึง holderName, ระบุรายรับ/รายจ่ายจากชื่อบัญชี, ใช้ memo → category (✅ ทดสอบ production แล้ว)
 - [x] Parser: เพิ่ม keyword "ชำระ" เป็น expense type — รองรับ text จาก OCR สลิป
 - [x] Fix: แก้ชื่อใน Settings อัปเดตทันที — JWT callback handle trigger=update
+- [x] Fix: camera button ใช้งานง่ายขึ้น — mini menu แทน long-press; รับไฟล์ถึง 20MB + resize ก่อนส่ง
+- [x] Fix: Transactions page แสดงข้อมูลใหม่ทันที — router.refresh() + window focus re-fetch
+- [x] Perf: parse API เร็วขึ้น — cache categories ด้วย unstable_cache (TTL 5 นาที)
+- [x] **User Behavior Tracking** — AppEvent model, POST /api/events, trackEvent() fire-and-forget, PageTracker component, track: transaction_saved/rejected, voice_used, ocr_used, ocr_corrected, export_done, page_view
+- [x] **User Feedback** — Feedback model, POST /api/feedback, FeedbackButton floating ล่างขวา (ดาว 1-5 + ประเภท + ข้อความ)
+- [x] **Admin Analytics** — GET /api/admin/analytics, หน้า /admin (events, daily chart, top users, OCR stats, feedbacks)
+- [x] **OCR Correction + Learning Data** — OcrReviewModal ให้ user แก้ข้อความ OCR ก่อน submit, บันทึก correction ลง OcrCorrection table, GET /api/ocr-corrections สำหรับ admin export
 
 ---
 

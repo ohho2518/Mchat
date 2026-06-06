@@ -6,12 +6,41 @@
 
 ## 2026-06-06
 
+### Features — User Behavior Tracking + Feedback + OCR Learning Data
+
+- Added: **AppEvent model** — บันทึก event การใช้งาน (transaction_saved, transaction_rejected, voice_used, ocr_used, ocr_corrected, export_done, page_view)
+- Added: `POST /api/events` — fire-and-forget event tracking endpoint
+- Added: `trackEvent()` utility ใน `src/lib/analytics/track.ts`
+- Added: **PageTracker component** — track page_view ทุกครั้งที่เปลี่ยนหน้า
+- Added: **FeedbackButton** — ปุ่มลอยมุมขวาล่าง, modal ให้ rating ดาว 1-5 + ประเภท (บัค/ฟีเจอร์/ทั่วไป) + ข้อความ
+- Added: `POST /api/feedback` — บันทึก feedback ลง DB
+- Added: **Admin Analytics page** (`/admin`) — event counts, daily bar chart (7 วัน), top users, OCR correction stats, recent feedbacks (admin only)
+- Added: `GET /api/admin/analytics` — stats รวมใน 30 วัน
+- Added: **OCR Correction + Learning Data** — `OcrReviewModal` แสดงผล OCR ให้ผู้ใช้แก้ไขก่อน submit, บันทึกคู่ original↔corrected ลง `OcrCorrection` table
+- Added: `POST /api/ocr-corrections` — บันทึกเฉพาะเมื่อ user แก้ไขจริง
+- Added: `GET /api/ocr-corrections` — admin-only export JSON สำหรับใช้เป็น training data
+
 ### Bug Fixes
 - Fixed: ปุ่มกล้อง (SlipUploadButton) ต้องกดค้างถึงจะถ่ายรูปได้ — เปลี่ยนเป็น mini menu (ถ่ายรูป / เลือกจากคลัง) เมื่อแตะปุ่มครั้งเดียว
 - Fixed: รูปภาพจากกล้องมือถือ (5–15MB) ถูก reject ก่อน resize — ย้าย size check ไปใช้ 20MB และให้ resizeImage() บีบก่อนส่ง API เสมอ
+- Fixed: Transactions page ไม่แสดงข้อมูลใหม่หลังบันทึก — router.refresh() + window focus re-fetch
+- Perf: parse API ช้า (DB query ทุกครั้ง) — cache categories ด้วย unstable_cache TTL 5 นาที
 
 ### Files Changed
-`src/components/chat/SlipUploadButton.tsx`
+`prisma/schema.prisma` (+ AppEvent, Feedback, OcrCorrection models)  
+`src/lib/analytics/track.ts` (new)  
+`src/app/api/events/route.ts` (new)  
+`src/app/api/feedback/route.ts` (new)  
+`src/app/api/ocr-corrections/route.ts` (new)  
+`src/app/api/admin/analytics/route.ts` (new)  
+`src/app/admin/page.tsx` (new)  
+`src/components/ui/FeedbackButton.tsx` (new)  
+`src/components/layout/PageTracker.tsx` (new)  
+`src/components/chat/OcrReviewModal.tsx` (new)  
+`src/components/layout/AppShell.tsx` (FeedbackButton + PageTracker)  
+`src/app/chat/page.tsx` (trackEvent saved/rejected)  
+`src/components/chat/VoiceInputButton.tsx` (trackEvent voice_used)  
+`src/components/chat/SlipUploadButton.tsx` (OCR review modal + trackEvent)
 
 ---
 
