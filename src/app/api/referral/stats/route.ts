@@ -2,6 +2,19 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
+import { generateReferralCode } from '@/lib/referral'
+
+async function getOrCreateReferralCode(userId: string) {
+  const existing = await prisma.referralCode.findUnique({ where: { userId } })
+  if (existing) return existing
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+  for (let i = 0; i < 10; i++) {
+    const code = generateReferralCode(user?.name ?? 'USER')
+    const taken = await prisma.referralCode.findUnique({ where: { code } })
+    if (!taken) return prisma.referralCode.create({ data: { userId, code } })
+  }
+  return prisma.referralCode.create({ data: { userId, code: `REF${Date.now().toString(36).toUpperCase().slice(-6)}` } })
+}
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -11,7 +24,7 @@ export async function GET() {
 
   try {
     const [referralCode, referrals, commissionAgg, payoutAgg] = await Promise.all([
-      prisma.referralCode.findUnique({ where: { userId } }),
+      getOrCreateReferralCode(userId),
       prisma.referral.findMany({ where: { referrerUserId: userId } }),
       prisma.commission.groupBy({
         by: ['status'],
