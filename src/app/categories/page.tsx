@@ -1,13 +1,17 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Spinner } from '@/components/ui/Spinner'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { UpgradePrompt } from '@/components/ui/UpgradePrompt'
 import { CategoryCard, CategoryForm } from '@/components/categories'
 import type { Category } from '@/types/transaction'
 import { cn } from '@/lib/utils/cn'
 import { Tag } from 'lucide-react'
+import { PLAN_LIMITS } from '@/lib/features'
+import type { Plan } from '@/lib/features'
 
 type TabType = 'income' | 'expense' | 'transfer' | 'debt'
 const TABS: { value: TabType; label: string }[] = [
@@ -23,13 +27,20 @@ interface SaveData {
 }
 
 export default function CategoriesPage() {
+  const { data: session } = useSession()
   const [categories,   setCategories]   = useState<Category[]>([])
   const [loading,      setLoading]      = useState(true)
   const [tab,          setTab]          = useState<TabType>('expense')
   const [formOpen,     setFormOpen]     = useState(false)
+  const [showUpgrade,  setShowUpgrade]  = useState(false)
   const [editTarget,   setEditTarget]   = useState<Category | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
   const [deleting,     setDeleting]     = useState(false)
+
+  const plan       = (session?.user?.plan ?? 'free') as Plan
+  const catLimit   = PLAN_LIMITS[plan].categories
+  const customCount = categories.filter(c => !c.isDefault).length
+  const atLimit    = catLimit !== null && customCount >= catLimit
 
   const fetch_ = useCallback(async () => {
     setLoading(true)
@@ -112,11 +123,32 @@ export default function CategoriesPage() {
 
       {/* FAB — สร้างใหม่ */}
       <button
-        onClick={() => { setEditTarget(null); setFormOpen(true) }}
+        onClick={() => {
+          if (atLimit) { setShowUpgrade(true); return }
+          setEditTarget(null); setFormOpen(true)
+        }}
         className="fixed bottom-20 right-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:bg-blue-800 transition-colors z-30"
       >
         <Plus className="h-6 w-6" />
       </button>
+
+      {/* Upgrade prompt modal */}
+      {showUpgrade && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowUpgrade(false)} />
+          <div className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <UpgradePrompt
+              feature={`สร้างหมวดหมู่ได้สูงสุด ${catLimit} หมวดหมู่ (แผน Free)`}
+            />
+            <button
+              onClick={() => setShowUpgrade(false)}
+              className="mt-3 w-full rounded-xl border border-gray-200 py-2 text-sm text-gray-600"
+            >
+              ปิด
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Form modal */}
       <CategoryForm

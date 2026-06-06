@@ -1,7 +1,9 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Download } from 'lucide-react'
+import { Download, Lock } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { UpgradePrompt } from '@/components/ui/UpgradePrompt'
 import {
   TransactionFilter, TransactionTable, TransactionForm,
   type FilterState,
@@ -11,6 +13,8 @@ import { exportCsv }   from '@/lib/export/exportCsv'
 import type { Transaction } from '@/types/transaction'
 import { format } from 'date-fns'
 import { trackEvent } from '@/lib/analytics/track'
+import { PLAN_LIMITS } from '@/lib/features'
+import type { Plan } from '@/lib/features'
 
 interface Pagination {
   page: number; limit: number; total: number; totalPages: number
@@ -29,16 +33,21 @@ function normalize(data: Transaction[]): Transaction[] {
 }
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [pagination,   setPagination]   = useState<Pagination>({ page: 1, limit: LIMIT, total: 0, totalPages: 0 })
-  const [filter,       setFilter]       = useState<FilterState>(DEFAULT_FILTER)
-  const [loading,      setLoading]      = useState(true)
-  const [error,        setError]        = useState<string | null>(null)
-  const [editTarget,   setEditTarget]   = useState<Transaction | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null)
-  const [deleting,     setDeleting]     = useState(false)
-  const [showExport,   setShowExport]   = useState(false)
+  const { data: session } = useSession()
+  const [transactions,  setTransactions] = useState<Transaction[]>([])
+  const [pagination,    setPagination]   = useState<Pagination>({ page: 1, limit: LIMIT, total: 0, totalPages: 0 })
+  const [filter,        setFilter]       = useState<FilterState>(DEFAULT_FILTER)
+  const [loading,       setLoading]      = useState(true)
+  const [error,         setError]        = useState<string | null>(null)
+  const [editTarget,    setEditTarget]   = useState<Transaction | null>(null)
+  const [deleteTarget,  setDeleteTarget] = useState<Transaction | null>(null)
+  const [deleting,      setDeleting]     = useState(false)
+  const [showExport,    setShowExport]   = useState(false)
+  const [showUpgrade,   setShowUpgrade]  = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
+
+  const plan      = (session?.user?.plan ?? 'free') as Plan
+  const canExport = PLAN_LIMITS[plan].export
 
   const fetchTransactions = useCallback(async (f: FilterState, page: number) => {
     setLoading(true)
@@ -152,13 +161,13 @@ export default function TransactionsPage() {
         </h2>
         <div className="relative" ref={exportRef}>
           <button
-            onClick={() => setShowExport((s) => !s)}
+            onClick={() => canExport ? setShowExport((s) => !s) : setShowUpgrade(true)}
             className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
           >
-            <Download className="h-3.5 w-3.5" />
+            {canExport ? <Download className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5 text-gray-400" />}
             Export
           </button>
-          {showExport && (
+          {showExport && canExport && (
             <div className="absolute right-0 top-full mt-1 z-20 w-32 rounded-xl bg-white border border-gray-100 shadow-lg overflow-hidden">
               <button onClick={() => doExport('excel')} className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50">
                 Excel (.xlsx)
@@ -169,6 +178,22 @@ export default function TransactionsPage() {
             </div>
           )}
         </div>
+
+        {/* Upgrade modal */}
+        {showUpgrade && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setShowUpgrade(false)} />
+            <div className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+              <UpgradePrompt feature="Export ข้อมูล Excel / CSV" />
+              <button
+                onClick={() => setShowUpgrade(false)}
+                className="mt-3 w-full rounded-xl border border-gray-200 py-2 text-sm text-gray-600"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Filter */}

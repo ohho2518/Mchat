@@ -1,12 +1,16 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, HandCoins } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Spinner }        from '@/components/ui/Spinner'
 import { EmptyState }     from '@/components/ui/EmptyState'
+import { UpgradePrompt }  from '@/components/ui/UpgradePrompt'
 import { DebtCard, DebtForm, PaymentModal } from '@/components/debts'
 import { cn } from '@/lib/utils/cn'
 import type { Debt, DebtType } from '@/types/debt'
+import { PLAN_LIMITS } from '@/lib/features'
+import type { Plan } from '@/lib/features'
 
 type TabValue = 'owe' | 'owed' | 'paid'
 
@@ -32,6 +36,7 @@ interface SaveData {
 }
 
 export default function DebtsPage() {
+  const { data: session } = useSession()
   const [debts,        setDebts]        = useState<Debt[]>([])
   const [loading,      setLoading]      = useState(true)
   const [tab,          setTab]          = useState<TabValue>('owe')
@@ -40,6 +45,9 @@ export default function DebtsPage() {
   const [payTarget,    setPayTarget]    = useState<Debt | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Debt | null>(null)
   const [deleting,     setDeleting]     = useState(false)
+
+  const plan     = (session?.user?.plan ?? 'free') as Plan
+  const canDebts = PLAN_LIMITS[plan].debts
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -53,18 +61,15 @@ export default function DebtsPage() {
 
   useEffect(() => { load() }, [load])
 
-  // ─── Tab filtering ───────────────────────────────────────────────────────
   const visible = debts.filter((d) => {
     if (tab === 'paid') return d.status === 'paid'
     const types = tab === 'owe' ? OWE_TYPES : OWED_TYPES
     return types.includes(d.debtType) && d.status !== 'paid' && d.status !== 'cancelled'
   })
 
-  // ─── Summary ─────────────────────────────────────────────────────────────
   const totalOwe  = sumRemaining(debts.filter((d) => OWE_TYPES.includes(d.debtType)  && d.status !== 'paid' && d.status !== 'cancelled'))
   const totalOwed = sumRemaining(debts.filter((d) => OWED_TYPES.includes(d.debtType) && d.status !== 'paid' && d.status !== 'cancelled'))
 
-  // ─── Save ────────────────────────────────────────────────────────────────
   const handleSave = async (data: SaveData, id?: string) => {
     const url    = id ? `/api/debts/${id}` : '/api/debts'
     const method = id ? 'PUT' : 'POST'
@@ -80,7 +85,6 @@ export default function DebtsPage() {
     await load()
   }
 
-  // ─── Pay ─────────────────────────────────────────────────────────────────
   const handlePay = async (id: string, payAmount: number) => {
     const debt = debts.find((d) => d.id === id)
     if (!debt) return
@@ -97,7 +101,6 @@ export default function DebtsPage() {
     await load()
   }
 
-  // ─── Delete ──────────────────────────────────────────────────────────────
   const handleDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
@@ -114,6 +117,11 @@ export default function DebtsPage() {
 
   return (
     <div className="p-4 space-y-4 pb-6">
+      {/* Plan gate banner for free users */}
+      {!canDebts && (
+        <UpgradePrompt feature="ติดตามลูกหนี้ / เจ้าหนี้" />
+      )}
+
       {/* Summary */}
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl bg-red-50 p-3 text-center">
@@ -151,7 +159,7 @@ export default function DebtsPage() {
         <EmptyState
           icon={HandCoins}
           title={tab === 'paid' ? 'ยังไม่มีรายการชำระแล้ว' : 'ไม่มีรายการค้างอยู่'}
-          description={tab !== 'paid' ? 'กด + เพื่อบันทึกรายการหนี้' : undefined}
+          description={tab !== 'paid' && canDebts ? 'กด + เพื่อบันทึกรายการหนี้' : undefined}
         />
       ) : (
         <div className="space-y-3">
@@ -167,13 +175,15 @@ export default function DebtsPage() {
         </div>
       )}
 
-      {/* FAB */}
-      <button
-        onClick={() => { setEditTarget(null); setFormOpen(true) }}
-        className="fixed bottom-20 right-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:bg-blue-800 transition-colors z-30"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
+      {/* FAB — only for paid plans */}
+      {canDebts && (
+        <button
+          onClick={() => { setEditTarget(null); setFormOpen(true) }}
+          className="fixed bottom-20 right-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:bg-blue-800 transition-colors z-30"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      )}
 
       <DebtForm
         open={formOpen}
