@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-06-06
+
+### Bug Fixes
+- Fixed: ปุ่มกล้อง (SlipUploadButton) ต้องกดค้างถึงจะถ่ายรูปได้ — เปลี่ยนเป็น mini menu (ถ่ายรูป / เลือกจากคลัง) เมื่อแตะปุ่มครั้งเดียว
+- Fixed: รูปภาพจากกล้องมือถือ (5–15MB) ถูก reject ก่อน resize — ย้าย size check ไปใช้ 20MB และให้ resizeImage() บีบก่อนส่ง API เสมอ
+
+### Files Changed
+`src/components/chat/SlipUploadButton.tsx`
+
+---
+
 ## 2026-06-05
 
 ### Features — OCR Slip + holderName

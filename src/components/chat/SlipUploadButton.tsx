@@ -1,6 +1,6 @@
 'use client'
-import { Camera, Loader2 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { Camera, ImageIcon, Loader2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils/cn'
 
 interface SlipUploadButtonProps {
@@ -9,7 +9,7 @@ interface SlipUploadButtonProps {
   disabled?: boolean
 }
 
-const MAX_SIZE_MB = 4
+const MAX_SOURCE_MB = 20 // กรอง source ขนาดใหญ่มากก่อน load เข้า canvas
 
 function resizeImage(file: File): Promise<{ base64: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
@@ -36,12 +36,25 @@ function resizeImage(file: File): Promise<{ base64: string; mimeType: string }> 
 
 export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButtonProps) {
   const [loading, setLoading]   = useState(false)
-  const fileRef   = useRef<HTMLInputElement>(null)
-  const cameraRef = useRef<HTMLInputElement>(null)
+  const [showMenu, setShowMenu] = useState(false)
+  const fileRef    = useRef<HTMLInputElement>(null)
+  const cameraRef  = useRef<HTMLInputElement>(null)
+  const menuRef    = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showMenu) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showMenu])
 
   const handleFile = async (file: File) => {
-    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-      onError?.(`ไฟล์ใหญ่เกิน ${MAX_SIZE_MB}MB`)
+    if (file.size > MAX_SOURCE_MB * 1024 * 1024) {
+      onError?.(`ไฟล์ใหญ่เกิน ${MAX_SOURCE_MB}MB`)
       return
     }
 
@@ -78,7 +91,7 @@ export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButt
   }
 
   return (
-    <>
+    <div className="relative" ref={menuRef}>
       {/* เลือกจาก Gallery / Files */}
       <input
         ref={fileRef}
@@ -96,12 +109,34 @@ export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButt
         className="hidden"
         onChange={onChange}
       />
+
+      {/* Mini menu */}
+      {showMenu && (
+        <div className="absolute bottom-10 left-0 z-50 min-w-[148px] rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+          <button
+            type="button"
+            onClick={() => { setShowMenu(false); cameraRef.current?.click() }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <Camera className="h-4 w-4 text-gray-500" />
+            ถ่ายรูป
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowMenu(false); fileRef.current?.click() }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <ImageIcon className="h-4 w-4 text-gray-500" />
+            เลือกจากคลัง
+          </button>
+        </div>
+      )}
+
       <button
         type="button"
-        onClick={() => fileRef.current?.click()}
-        onContextMenu={(e) => { e.preventDefault(); cameraRef.current?.click() }}
+        onClick={() => { if (!loading) setShowMenu(v => !v) }}
         disabled={disabled || loading}
-        title="แตะเพื่อเลือกรูป | กดค้างเพื่อถ่ายรูป"
+        title="อัปโหลดสลิป/บิล"
         className={cn(
           'flex h-8 w-8 items-center justify-center rounded-xl transition-colors',
           loading
@@ -115,6 +150,6 @@ export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButt
           : <Camera className="h-4 w-4" />
         }
       </button>
-    </>
+    </div>
   )
 }
