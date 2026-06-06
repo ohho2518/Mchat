@@ -17,7 +17,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const [eventCounts, recentFeedback, dailyEvents, topUsers] = await Promise.all([
+    const [eventCounts, recentFeedback, dailyEvents, topUsers, ocrStats] = await Promise.all([
       // Event breakdown (last 30 days)
       prisma.appEvent.groupBy({
         by: ['event'],
@@ -50,6 +50,11 @@ export async function GET() {
         orderBy: { _count: { id: 'desc' } },
         take: 10,
       }),
+
+      // OCR correction stats (last 30 days)
+      prisma.ocrCorrection.count({
+        where: { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+      }),
     ])
 
     const topUserIds = topUsers.map((u) => u.userId)
@@ -67,6 +72,7 @@ export async function GET() {
         user:  nameMap[u.userId] ?? u.userId,
         count: u._count.id,
       })),
+      ocrCorrectionCount: ocrStats,
     })
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

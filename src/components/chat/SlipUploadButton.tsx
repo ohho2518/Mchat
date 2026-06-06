@@ -3,6 +3,7 @@ import { Camera, ImageIcon, Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils/cn'
 import { trackEvent } from '@/lib/analytics/track'
+import { OcrReviewModal } from './OcrReviewModal'
 
 interface SlipUploadButtonProps {
   onResult:  (text: string, holderName: string | null) => void
@@ -10,7 +11,12 @@ interface SlipUploadButtonProps {
   disabled?: boolean
 }
 
-const MAX_SOURCE_MB = 20 // กรอง source ขนาดใหญ่มากก่อน load เข้า canvas
+const MAX_SOURCE_MB = 20
+
+interface OcrResult {
+  originalText: string
+  holderName:   string | null
+}
 
 function resizeImage(file: File): Promise<{ base64: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
@@ -35,12 +41,21 @@ function resizeImage(file: File): Promise<{ base64: string; mimeType: string }> 
   })
 }
 
+function saveCorrection(originalText: string, correctedText: string, holderName: string | null) {
+  fetch('/api/ocr-corrections', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ originalText, correctedText, holderName: holderName ?? undefined }),
+  }).catch(() => { /* swallow */ })
+}
+
 export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButtonProps) {
-  const [loading, setLoading]   = useState(false)
-  const [showMenu, setShowMenu] = useState(false)
-  const fileRef    = useRef<HTMLInputElement>(null)
-  const cameraRef  = useRef<HTMLInputElement>(null)
-  const menuRef    = useRef<HTMLDivElement>(null)
+  const [loading,    setLoading]    = useState(false)
+  const [showMenu,   setShowMenu]   = useState(false)
+  const [reviewing,  setReviewing]  = useState<OcrResult | null>(null)
+  const fileRef   = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const menuRef   = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!showMenu) return
@@ -63,12 +78,11 @@ export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButt
     try {
       const { base64, mimeType } = await resizeImage(file)
 
-      const res = await fetch('/api/parser/ocr', {
-        method: 'POST',
+      const res  = await fetch('/api/parser/ocr', {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64, mimeType }),
+        body:    JSON.stringify({ imageBase64: base64, mimeType }),
       })
-
       const data = await res.json()
 
       if (!res.ok) {
@@ -77,7 +91,8 @@ export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButt
       }
 
       trackEvent('ocr_used', { hasHolder: !!data.holderName })
-      onResult(data.text, data.holderName ?? null)
+      // แสดง modal ให้ผู้ใช้ตรวจสอบและแก้ไขก่อน
+      setReviewing({ originalText: data.text, holderName: data.holderName ?? null })
     } catch {
       onError?.('เกิดข้อผิดพลาด กรุณาลองใหม่')
     } finally {
@@ -87,71 +102,83 @@ export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButt
     }
   }
 
+  const handleConfirm = (finalText: string) => {
+    if (!reviewing) return
+    // บันทึก correction เฉพาะเมื่อ user แก้ไขข้อความ
+    if (finalText !== reviewing.originalText.trim()) {
+      saveCorrection(reviewing.originalText, finalText, reviewing.holderName)
+      trackEvent('ocr_corrected')
+    }
+    setReviewing(null)
+    onResult(finalText, reviewing.holderName)
+  }
+
+  const handleCancel = () => setReviewing(null)
+
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) handleFile(file)
   }
 
   return (
-    <div className="relative" ref={menuRef}>
-      {/* เลือกจาก Gallery / Files */}
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={onChange}
-      />
-      {/* ถ่ายภาพจากกล้อง (mobile) */}
-      <input
-        ref={cameraRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={onChange}
-      />
+    <>
+      <div className="relative" ref={menuRef}>
+        {/* เลือกจาก Gallery / Files */}
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onChange} />
+        {/* ถ่ายภาพจากกล้อง (mobile) */}
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onChange} />
 
-      {/* Mini menu */}
-      {showMenu && (
-        <div className="absolute bottom-10 left-0 z-50 min-w-[148px] rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
-          <button
-            type="button"
-            onClick={() => { setShowMenu(false); cameraRef.current?.click() }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            <Camera className="h-4 w-4 text-gray-500" />
-            ถ่ายรูป
-          </button>
-          <button
-            type="button"
-            onClick={() => { setShowMenu(false); fileRef.current?.click() }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            <ImageIcon className="h-4 w-4 text-gray-500" />
-            เลือกจากคลัง
-          </button>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => { if (!loading) setShowMenu(v => !v) }}
-        disabled={disabled || loading}
-        title="อัปโหลดสลิป/บิล"
-        className={cn(
-          'flex h-8 w-8 items-center justify-center rounded-xl transition-colors',
-          loading
-            ? 'text-blue-500'
-            : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600',
-          'disabled:opacity-50 disabled:cursor-not-allowed'
+        {/* Mini menu */}
+        {showMenu && (
+          <div className="absolute bottom-10 left-0 z-50 min-w-[148px] rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+            <button
+              type="button"
+              onClick={() => { setShowMenu(false); cameraRef.current?.click() }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <Camera className="h-4 w-4 text-gray-500" />
+              ถ่ายรูป
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowMenu(false); fileRef.current?.click() }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <ImageIcon className="h-4 w-4 text-gray-500" />
+              เลือกจากคลัง
+            </button>
+          </div>
         )}
-      >
-        {loading
-          ? <Loader2 className="h-4 w-4 animate-spin" />
-          : <Camera className="h-4 w-4" />
-        }
-      </button>
-    </div>
+
+        <button
+          type="button"
+          onClick={() => { if (!loading) setShowMenu(v => !v) }}
+          disabled={disabled || loading}
+          title="อัปโหลดสลิป/บิล"
+          className={cn(
+            'flex h-8 w-8 items-center justify-center rounded-xl transition-colors',
+            loading
+              ? 'text-blue-500'
+              : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600',
+            'disabled:opacity-50 disabled:cursor-not-allowed'
+          )}
+        >
+          {loading
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <Camera className="h-4 w-4" />
+          }
+        </button>
+      </div>
+
+      {/* OCR Review Modal */}
+      {reviewing && (
+        <OcrReviewModal
+          originalText={reviewing.originalText}
+          holderName={reviewing.holderName}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+        />
+      )}
+    </>
   )
 }

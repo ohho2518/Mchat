@@ -10,10 +10,11 @@ interface FeedbackRow {
   user: { name: string; email: string }
 }
 interface Analytics {
-  eventCounts:    EventCount[]
-  dailyEvents:    DailyEvent[]
-  topUsers:       TopUser[]
-  recentFeedback: FeedbackRow[]
+  eventCounts:        EventCount[]
+  dailyEvents:        DailyEvent[]
+  topUsers:           TopUser[]
+  recentFeedback:     FeedbackRow[]
+  ocrCorrectionCount: number
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -64,6 +65,10 @@ export default function AdminPage() {
               <p className="text-2xl font-bold text-gray-800 mt-1">{e.count.toLocaleString()}</p>
             </div>
           ))}
+          <div className="rounded-xl bg-amber-50 border border-amber-100 shadow-sm p-4">
+            <p className="text-xs text-amber-600">OCR แก้ไขแล้ว</p>
+            <p className="text-2xl font-bold text-amber-700 mt-1">{data.ocrCorrectionCount.toLocaleString()}</p>
+          </div>
         </div>
       </section>
 
@@ -92,6 +97,26 @@ export default function AdminPage() {
               <span className="text-sm font-semibold text-blue-600">{u.count}</span>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* OCR Learning Data */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-600">OCR Learning Data</h2>
+          <a
+            href="/api/ocr-corrections"
+            target="_blank"
+            className="text-xs text-blue-600 hover:underline"
+          >
+            ดูทั้งหมด (JSON)
+          </a>
+        </div>
+        <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4">
+          <p className="text-sm text-gray-500">
+            มี <span className="font-semibold text-gray-800">{data.ocrCorrectionCount}</span> รายการที่ผู้ใช้แก้ไขข้อความ OCR
+            — ใช้เป็น training data สำหรับปรับปรุง prompt ได้
+          </p>
         </div>
       </section>
 
