@@ -1,14 +1,15 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MessageCircle, BarChart2, List, Settings } from 'lucide-react'
+import { MessageCircle, BarChart2, List, Gift, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 const NAV_ITEMS = [
-  { href: '/chat', label: 'บันทึก', icon: MessageCircle },
-  { href: '/dashboard', label: 'รายงาน', icon: BarChart2 },
-  { href: '/transactions', label: 'รายการ', icon: List },
-  { href: '/settings', label: 'ตั้งค่า', icon: Settings },
+  { href: '/chat',         label: 'บันทึก',      icon: MessageCircle },
+  { href: '/dashboard',    label: 'รายงาน',      icon: BarChart2 },
+  { href: '/transactions', label: 'รายการ',      icon: List },
+  { href: '/referral',     label: 'แนะนำเพื่อน', icon: Gift },
+  { href: '/settings',     label: 'ตั้งค่า',      icon: Settings },
 ]
 
 export function BottomNav() {
