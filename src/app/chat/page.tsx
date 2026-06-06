@@ -6,6 +6,7 @@ import { TransactionForm } from '@/components/transactions'
 import { Spinner } from '@/components/ui'
 import type { ParsedTransaction, Transaction } from '@/types/transaction'
 import { format } from 'date-fns'
+import { trackEvent } from '@/lib/analytics/track'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type MsgUser   = { id: string; role: 'user';   text: string }
@@ -115,6 +116,10 @@ export default function ChatPage() {
         text: `บันทึก${parsed.type === 'income' ? 'รายรับ' : parsed.type === 'expense' ? 'รายจ่าย' : 'รายการ'} ฿${parsed.amount?.toLocaleString('th-TH')} แล้ว ✓`,
         variant: 'success',
       }])
+      trackEvent('transaction_saved', {
+        type: parsed.type, amount: parsed.amount,
+        confidence: parsed.confidence, category: parsed.categoryName,
+      })
       // Invalidate Next.js router cache so Transactions/Dashboard pages re-fetch on next visit
       router.refresh()
     } catch {
@@ -128,6 +133,12 @@ export default function ChatPage() {
 
   // ─── Reject ───────────────────────────────────────────────────────────────
   const handleReject = (msgId: string) => {
+    const msg = messages.find((m) => m.id === msgId)
+    if (msg?.role === 'parsed') {
+      trackEvent('transaction_rejected', {
+        type: msg.parsed.type, amount: msg.parsed.amount, confidence: msg.parsed.confidence,
+      })
+    }
     setMessages((prev) =>
       prev.map((m) => m.id === msgId ? { ...m, status: 'rejected' } as MsgParsed : m)
     )

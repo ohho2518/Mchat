@@ -2,6 +2,7 @@
 import { Mic, MicOff } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils/cn'
+import { trackEvent } from '@/lib/analytics/track'
 
 interface VoiceInputButtonProps {
   onResult: (text: string) => void
@@ -93,6 +94,7 @@ export function VoiceInputButton({ onResult, disabled }: VoiceInputButtonProps) 
       activeRef.current  = true
       resultRef.current  = ''
       setListening(true)
+      trackEvent('voice_used')
       startRec()
     }
   }

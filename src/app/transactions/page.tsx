@@ -10,6 +10,7 @@ import { exportExcel } from '@/lib/export/exportExcel'
 import { exportCsv }   from '@/lib/export/exportCsv'
 import type { Transaction } from '@/types/transaction'
 import { format } from 'date-fns'
+import { trackEvent } from '@/lib/analytics/track'
 
 interface Pagination {
   page: number; limit: number; total: number; totalPages: number
@@ -110,6 +111,7 @@ export default function TransactionsPage() {
     const data = normalize(body.data)
     const filename = `transactions_${format(new Date(), 'yyyyMMdd')}`
 
+    trackEvent('export_done', { format: fmt, count: data.length })
     if (fmt === 'excel') {
       exportExcel(
         data.map((t) => ({

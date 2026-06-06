@@ -3,6 +3,8 @@ import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Header } from './Header'
 import { BottomNav } from './BottomNav'
+import { PageTracker } from './PageTracker'
+import { FeedbackButton } from '@/components/ui/FeedbackButton'
 
 const PAGE_TITLES: Record<string, string> = {
   '/chat': 'MChat',
@@ -26,6 +28,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
+      <PageTracker />
       <Header
         title={title}
         userName={isChat ? (session?.user?.name ?? undefined) : undefined}
@@ -34,6 +37,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <BottomNav />
+      <FeedbackButton />
     </div>
   )
 }

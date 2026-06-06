@@ -26,6 +26,8 @@ model User {
   categories   Category[]
   transactions Transaction[]
   debts        Debt[]
+  appEvents    AppEvent[]
+  feedbacks    Feedback[]
 }
 
 // ─── Accounts ─────────────────────────────────────────────
@@ -91,6 +93,29 @@ model Transaction {
 
   user     User      @relation(fields: [userId], references: [id])
   category Category? @relation(fields: [categoryId], references: [id])
+}
+
+// ─── App Events (Behavior Tracking) ──────────────────────
+model AppEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  event     String   // transaction_saved | transaction_rejected | voice_used | ocr_used | export_done | page_view
+  meta      Json?    // { type, amount, confidence, categoryName, page, ... }
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+// ─── User Feedback ────────────────────────────────────────
+model Feedback {
+  id        String   @id @default(uuid())
+  userId    String
+  rating    Int?     // 1-5
+  category  String   // bug | feature | general
+  message   String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 // ─── Transfers ────────────────────────────────────────────

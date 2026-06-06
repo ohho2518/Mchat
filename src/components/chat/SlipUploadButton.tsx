@@ -2,6 +2,7 @@
 import { Camera, ImageIcon, Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils/cn'
+import { trackEvent } from '@/lib/analytics/track'
 
 interface SlipUploadButtonProps {
   onResult:  (text: string, holderName: string | null) => void
@@ -75,6 +76,7 @@ export function SlipUploadButton({ onResult, onError, disabled }: SlipUploadButt
         return
       }
 
+      trackEvent('ocr_used', { hasHolder: !!data.holderName })
       onResult(data.text, data.holderName ?? null)
     } catch {
       onError?.('เกิดข้อผิดพลาด กรุณาลองใหม่')
