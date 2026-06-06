@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-2026-06-06 (Plan/Feature Gate system — Phase 1)
+2026-06-06 (Plan system Phase 1+1.5+2 complete)
 
 ---
 
@@ -47,6 +47,23 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 - [x] **Admin Analytics** — GET /api/admin/analytics, หน้า /admin (events, daily chart, top users, OCR stats, feedbacks)
 - [x] **OCR Correction + Learning Data** — OcrReviewModal ให้ user แก้ข้อความ OCR ก่อน submit, บันทึก correction ลง OcrCorrection table, GET /api/ocr-corrections สำหรับ admin export
 - [x] **Transfer UI** — หน้า /transfers, TransferCard/TransferForm, API CRUD (/api/transfers, /api/transfers/[id]), linked from Settings
+- [x] **Plan System Phase 2 (Payment Flow)**:
+  - `src/lib/promptpay.ts` — EMVCo PromptPay QR payload generator (CRC-16 CCITT)
+  - `GET /api/payments/info` — คืน promptpayPhone จาก env (สำหรับ QR generation)
+  - `POST /api/payments` — สร้าง pending Payment record (ป้องกัน duplicate pending)
+  - `GET /api/payments` — list ประวัติชำระของ user
+  - `GET /api/admin/payments` — list pending payments สำหรับ admin
+  - `PATCH /api/admin/payments/[id]` — ยืนยัน → paid + update user.plan + planExpiresAt
+  - `DELETE /api/admin/payments/[id]` — ปฏิเสธ → failed
+  - `/pricing` page — plan comparison + feature table + PaymentModal (QR + period selector)
+  - Admin page — Pending Payments section ด้านบนสุด (confirm/reject inline)
+  - Settings — ลิงก์ "ดูแผนราคาทั้งหมด" → /pricing
+  - UpgradePrompt → /pricing (เดิม /settings#plan)
+  - `.env.example` — เพิ่ม ADMIN_EMAIL + PROMPTPAY_PHONE
+- [x] **Plan System Phase 1.5 (Frontend Enforcement)**:
+  - Categories/Accounts: gate FAB when at limit
+  - Transactions: gate Export button with Lock icon
+  - Transfers/Debts: UpgradePrompt banner + hide FAB for free users
 - [x] **Plan/Feature Gate System (Phase 1)** — FREE/PRO/MAX plan tiers:
   - DB: `Plan` enum, `UsageQuota` model, `Payment` model + `PaymentStatus` enum on User
   - `src/lib/features.ts` — PLAN_LIMITS, PLAN_LABELS, PLAN_COLORS, PLAN_PRICES, getThaiMonth()
@@ -86,9 +103,9 @@ Phase 1 Plan System เสร็จแล้ว — รอ QA + Phase 2 (Payment
 เรียงตามลำดับความสำคัญ:
 
 1. **QA ใน Production** — ทดสอบ golden path บน mobile browser จริง (Android Chrome, iOS Safari)
-2. **Phase 2: Payment Flow** — PromptPay QR code generation + Omise webhook + auto plan activation
-3. **Phase 1.5: Frontend enforcement** — UpgradePrompt ใน AccountForm, CategoryForm, Export button, Transfers/Debts pages
-4. **ตั้งค่า ADMIN_EMAIL env var บน Vercel** — `ADMIN_EMAIL=vndn2518@gmail.com` (จำเป็น หลังจากลบ hardcode fallback)
+2. **ตั้งค่า PROMPTPAY_PHONE ใน Vercel** — `PROMPTPAY_PHONE=0812345678` เพื่อให้ QR code ใน /pricing ทำงาน
+3. **Phase 3: Omise automated payment** — webhook auto-activate (optional, ถ้า volume สูง)
+4. **ตั้งค่า ADMIN_EMAIL env var บน Vercel** — `ADMIN_EMAIL=vndn2518@gmail.com`
 3. ~~**Transfer UI**~~ ✅ เสร็จ
 4. ~~**Debt Tracking UI**~~ ✅ เสร็จ
 5. ~~**Account Management UI**~~ ✅ เสร็จ
@@ -143,6 +160,8 @@ Phase 1 Plan System เสร็จแล้ว — รอ QA + Phase 2 (Payment
 | Prisma v6 + Next.js 16 | เวอร์ชันล่าสุดตอน init โปรเจกต์ |
 | scrypt N:salt:hash format | เก็บ cost factor ไว้ใน hash string เพื่อ backward-compat เมื่อ upgrade N ในอนาคต |
 | In-memory rate limiting (Map) | ไม่ต้องการ Redis สำหรับ scale ปัจจุบัน; per-instance แต่เพียงพอสำหรับ personal app |
+| Phase 2 ใช้ manual confirmation (ไม่ใช้ webhook) | MVP รองรับ volume น้อย; Omise webhook เพิ่มได้ใน Phase 3 ถ้าจำเป็น |
+| PromptPay QR สร้าง client-side | payload ไม่มีข้อมูล sensitive — phone อยู่ใน QR อยู่แล้ว; ไม่ต้องส่งผ่าน server |
 | Plan ใน JWT token (ไม่ query DB ทุก request) | ลด DB load; plan สตาเลถ้า admin เปลี่ยน plan — user ต้อง re-login เพื่อให้มีผล |
 | UsageQuota keyed ด้วย userId+month (Thai timezone) | นับ OCR ต่อเดือนตาม TZ ไทย (UTC+7) เพื่อให้ตรงกับความคาดหวังผู้ใช้ |
 | db push (ไม่ใช้ migrate) | ลด friction สำหรับ Supabase cloud; ใช้ migrate เฉพาะเมื่อต้องการ rollback history |

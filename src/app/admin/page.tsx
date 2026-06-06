@@ -23,6 +23,10 @@ interface AdminUser {
   plan: Plan; planExpiresAt: string | null; createdAt: string
   _count: { transactions: number }
 }
+interface PendingPayment {
+  id: string; plan: Plan; months: number; amount: number; method: string; createdAt: string
+  user: { id: string; name: string; email: string; plan: Plan }
+}
 
 const EVENT_LABELS: Record<string, string> = {
   transaction_saved:    'บันทึกรายการ',
@@ -134,8 +138,17 @@ export default function AdminPage() {
   const [data,    setData]    = useState<Analytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState<string | null>(null)
-  const [users,   setUsers]   = useState<AdminUser[]>([])
-  const [usersLoading, setUsersLoading] = useState(true)
+  const [users,           setUsers]           = useState<AdminUser[]>([])
+  const [usersLoading,    setUsersLoading]    = useState(true)
+  const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([])
+  const [confirmingId,    setConfirmingId]    = useState<string | null>(null)
+
+  const loadPending = () => {
+    fetch('/api/admin/payments')
+      .then(r => r.ok ? r.json() : [])
+      .then(setPendingPayments)
+      .catch(() => {})
+  }
 
   useEffect(() => {
     fetch('/api/admin/analytics')
@@ -153,7 +166,29 @@ export default function AdminPage() {
       .then(setUsers)
       .catch(() => {})
       .finally(() => setUsersLoading(false))
+
+    loadPending()
   }, [])
+
+  const confirmPayment = async (payment: PendingPayment) => {
+    setConfirmingId(payment.id)
+    try {
+      const res = await fetch(`/api/admin/payments/${payment.id}`, { method: 'PATCH' })
+      if (res.ok) {
+        loadPending()
+        setUsers(prev => prev.map(u =>
+          u.id === payment.user.id ? { ...u, plan: payment.plan } : u
+        ))
+      }
+    } finally {
+      setConfirmingId(null)
+    }
+  }
+
+  const rejectPayment = async (id: string) => {
+    await fetch(`/api/admin/payments/${id}`, { method: 'DELETE' })
+    loadPending()
+  }
 
   if (loading) return <div className="p-8 text-center text-gray-500 text-sm">กำลังโหลด...</div>
   if (error)   return <div className="p-8 text-center text-red-500 text-sm">{error}</div>
@@ -162,6 +197,61 @@ export default function AdminPage() {
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-6 pb-8">
       <h1 className="text-lg font-bold text-gray-800">Analytics (30 วันล่าสุด)</h1>
+
+      {/* Pending Payments */}
+      {pendingPayments.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <h2 className="text-sm font-semibold text-gray-600">แจ้งชำระที่รอยืนยัน</h2>
+            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-red-500 text-white text-xs font-bold">
+              {pendingPayments.length}
+            </span>
+          </div>
+          <div className="space-y-3">
+            {pendingPayments.map((p) => (
+              <div key={p.id} className="rounded-xl bg-amber-50 border border-amber-200 p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{p.user.name}</p>
+                    <p className="text-xs text-gray-500">{p.user.email}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border
+                      ${PLAN_COLORS[p.plan].bg} ${PLAN_COLORS[p.plan].text} ${PLAN_COLORS[p.plan].border}`}>
+                      {PLAN_LABELS[p.plan]}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-gray-600">
+                  <span>฿{Number(p.amount).toLocaleString()}</span>
+                  <span>·</span>
+                  <span>{p.months} เดือน</span>
+                  <span>·</span>
+                  <span>{p.method === 'promptpay' ? 'PromptPay' : 'Manual'}</span>
+                  <span className="ml-auto text-gray-400">
+                    {new Date(p.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => confirmPayment(p)}
+                    disabled={confirmingId === p.id}
+                    className="flex-1 rounded-lg bg-green-600 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {confirmingId === p.id ? '...' : '✓ ยืนยัน'}
+                  </button>
+                  <button
+                    onClick={() => rejectPayment(p.id)}
+                    className="flex-1 rounded-lg border border-red-200 py-1.5 text-xs text-red-600 hover:bg-red-50"
+                  >
+                    ✗ ปฏิเสธ
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Event counts */}
       <section>

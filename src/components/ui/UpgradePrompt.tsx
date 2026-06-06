@@ -30,10 +30,10 @@ export function UpgradePrompt({ feature, requiredPlan = 'pro', compact = false }
         ฟีเจอร์นี้ต้องการแผน {label} เริ่มต้น ฿{price}/เดือน
       </p>
       <a
-        href="/settings#plan"
+        href="/pricing"
         className="inline-block rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-700"
       >
-        ดูรายละเอียดแผน
+        ดูแผนราคา
       </a>
     </div>
   )

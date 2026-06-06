@@ -184,16 +184,35 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              {/* Upgrade nudge for free plan */}
-              {quota.plan === 'free' && (
-                <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 text-xs text-blue-700 space-y-1">
-                  <p className="font-medium">อัปเกรดเป็น Pro เพื่อรับสิทธิ์เพิ่ม</p>
-                  <ul className="space-y-0.5 text-blue-600">
-                    <li>• OCR 100 ครั้ง/เดือน (ปัจจุบัน 20)</li>
-                    <li>• ดูประวัติไม่จำกัด (ปัจจุบัน 90 วัน)</li>
-                    <li>• Export Excel/CSV, บัญชีไม่จำกัด</li>
-                  </ul>
-                  <p className="font-semibold mt-1">฿{PLAN_PRICES.pro.monthly}/เดือน</p>
+              {/* Upgrade nudge for free/pro plan */}
+              {quota.plan !== 'max' && (
+                <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 text-xs text-blue-700 space-y-2">
+                  {quota.plan === 'free' ? (
+                    <>
+                      <p className="font-medium">อัปเกรดเป็น Pro เพื่อรับสิทธิ์เพิ่ม</p>
+                      <ul className="space-y-0.5 text-blue-600">
+                        <li>• OCR 100 ครั้ง/เดือน</li>
+                        <li>• ดูประวัติไม่จำกัด</li>
+                        <li>• Export Excel/CSV, บัญชีไม่จำกัด</li>
+                      </ul>
+                      <p className="font-semibold">฿{PLAN_PRICES.pro.monthly}/เดือน</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-medium">อัปเกรดเป็น Max</p>
+                      <ul className="space-y-0.5 text-blue-600">
+                        <li>• OCR ไม่จำกัด</li>
+                        <li>• รองรับหลายผู้ใช้ (5 คน)</li>
+                      </ul>
+                      <p className="font-semibold">฿{PLAN_PRICES.max.monthly}/เดือน</p>
+                    </>
+                  )}
+                  <a
+                    href="/pricing"
+                    className="block w-full text-center rounded-lg bg-blue-600 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+                  >
+                    ดูแผนราคาทั้งหมด
+                  </a>
                 </div>
               )}
             </div>
