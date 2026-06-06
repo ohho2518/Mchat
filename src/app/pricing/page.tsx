@@ -1,13 +1,19 @@
 'use client'
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Check, X, Zap, QrCode } from 'lucide-react'
-import { QRCodeSVG } from 'qrcode.react'
+import { Check, X, Zap, QrCode, Loader2 } from 'lucide-react'
 import { PLAN_LABELS, PLAN_PRICES, PLAN_COLORS } from '@/lib/features'
 import { generatePromptPayPayload, formatThaiPhone } from '@/lib/promptpay'
 import type { Plan } from '@/lib/features'
 import { cn } from '@/lib/utils/cn'
+
+// Dynamic import — ป้องกัน SSR error บน Next.js App Router
+const QRCodeSVG = dynamic(
+  () => import('qrcode.react').then((m) => m.QRCodeSVG),
+  { ssr: false, loading: () => <Loader2 className="h-8 w-8 animate-spin text-gray-300" /> }
+)
 
 // ─── Feature comparison ───────────────────────────────────────────────────────
 const FEATURES: { label: string; free: string | boolean; pro: string | boolean; max: string | boolean }[] = [
@@ -39,11 +45,12 @@ function featureCell(val: string | boolean) {
 interface PaymentModalProps {
   plan: 'pro' | 'max'
   promptpayPhone: string | null
+  phoneLoading: boolean
   onClose: () => void
   onSuccess: () => void
 }
 
-function PaymentModal({ plan, promptpayPhone, onClose, onSuccess }: PaymentModalProps) {
+function PaymentModal({ plan, promptpayPhone, phoneLoading, onClose, onSuccess }: PaymentModalProps) {
   const [period,   setPeriod]  = useState(PERIOD_OPTIONS[0])
   const [loading,  setLoading] = useState(false)
   const [sent,     setSent]    = useState(false)
@@ -129,21 +136,25 @@ function PaymentModal({ plan, promptpayPhone, onClose, onSuccess }: PaymentModal
             </div>
 
             {/* QR Code */}
-            {payload && promptpayPhone ? (
-              <div className="flex flex-col items-center mb-4">
-                <div className="p-3 rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div className="flex flex-col items-center mb-4">
+              <div className="p-3 rounded-2xl border border-gray-100 bg-white shadow-sm flex items-center justify-center min-h-[206px] min-w-[206px]">
+                {phoneLoading ? (
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
+                ) : payload && promptpayPhone ? (
                   <QRCodeSVG value={payload} size={180} />
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
+                ) : (
+                  <div className="text-center space-y-2">
+                    <QrCode className="h-10 w-10 text-gray-300 mx-auto" />
+                    <p className="text-xs text-gray-400">ไม่สามารถโหลด QR ได้</p>
+                  </div>
+                )}
+              </div>
+              {promptpayPhone && (
+                <p className="text-xs text-gray-500 mt-2 font-medium">
                   PromptPay: {formatThaiPhone(promptpayPhone)}
                 </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center mb-4 py-4">
-                <QrCode className="h-10 w-10 text-gray-300 mb-2" />
-                <p className="text-xs text-gray-400">ติดต่อ admin เพื่อรับข้อมูลการชำระ</p>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Instructions */}
             <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 mb-4 text-xs text-amber-800 space-y-1">
@@ -260,6 +271,7 @@ export default function PricingPage() {
   const router = useRouter()
   const [selectedPlan,    setSelectedPlan]    = useState<'pro' | 'max' | null>(null)
   const [promptpayPhone,  setPromptpayPhone]  = useState<string | null>(null)
+  const [phoneLoading,    setPhoneLoading]    = useState(true)
   const [pendingPayment,  setPendingPayment]  = useState(false)
 
   const currentPlan = (session?.user?.plan ?? 'free') as Plan
@@ -269,6 +281,7 @@ export default function PricingPage() {
       .then(r => r.ok ? r.json() : null)
       .then(data => setPromptpayPhone(data?.promptpayPhone ?? null))
       .catch(() => {})
+      .finally(() => setPhoneLoading(false))
 
     fetch('/api/payments')
       .then(r => r.ok ? r.json() : [])
@@ -355,6 +368,7 @@ export default function PricingPage() {
         <PaymentModal
           plan={selectedPlan}
           promptpayPhone={promptpayPhone}
+          phoneLoading={phoneLoading}
           onClose={() => setSelectedPlan(null)}
           onSuccess={() => {
             setSelectedPlan(null)
