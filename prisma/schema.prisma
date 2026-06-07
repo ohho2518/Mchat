@@ -167,14 +167,19 @@ model Feedback {
 
 // ─── OCR Corrections (Learning Data) ─────────────────────
 model OcrCorrection {
-  id            String   @id @default(uuid())
-  userId        String
-  originalText  String   // ข้อความที่ OCR อ่านมา
-  correctedText String   // ข้อความที่ user แก้ไข
-  holderName    String?  // ชื่อผู้โอน/ผู้รับ (ถ้ามี)
-  createdAt     DateTime @default(now())
+  id                 String    @id @default(uuid())
+  userId             String
+  originalText       String    // ข้อความที่ OCR อ่านมา
+  correctedText      String    // ข้อความที่ user แก้ไข
+  holderName         String?   // ชื่อผู้โอน/ผู้รับ (ถ้ามี)
+  status             String    @default("pending") // pending | reviewed | applied | rejected
+  reviewedType       String?   // income | expense | transfer | debt
+  reviewedCategoryId String?   // category id ที่ admin เลือก
+  adminNote          String?
+  reviewedAt         DateTime?
+  createdAt          DateTime  @default(now())
 
-  user          User     @relation(fields: [userId], references: [id])
+  user               User      @relation(fields: [userId], references: [id])
 }
 
 // ─── Transfers ────────────────────────────────────────────

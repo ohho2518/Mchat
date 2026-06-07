@@ -4,6 +4,302 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import { PLAN_LABELS, PLAN_COLORS } from '@/lib/features'
 import type { Plan } from '@/lib/features'
 
+// ─── Train OCR types ──────────────────────────────────────────────────────────
+interface OcrCorrectionRow {
+  id: string; originalText: string; correctedText: string
+  holderName: string | null; status: string
+  reviewedType: string | null; reviewedCategoryId: string | null
+  adminNote: string | null; createdAt: string
+  user: { name: string; email: string }
+}
+interface GlobalCategory {
+  id: string; name: string; type: string
+  keywords: { id: string; keyword: string }[]
+}
+interface CorrectionCounts { pending: number; applied: number; reviewed: number; rejected: number }
+
+const TYPE_OPTIONS = ['expense', 'income', 'transfer', 'debt'] as const
+const TYPE_LABEL: Record<string, string> = { expense: 'รายจ่าย', income: 'รายรับ', transfer: 'โอน', debt: 'หนี้' }
+const TYPE_COLOR: Record<string, string> = {
+  expense: 'bg-red-100 text-red-700 border-red-300',
+  income:  'bg-green-100 text-green-700 border-green-300',
+  transfer:'bg-blue-100 text-blue-700 border-blue-300',
+  debt:    'bg-orange-100 text-orange-700 border-orange-300',
+}
+
+function CorrectionCard({
+  c, categories, actioning,
+  onAction,
+}: {
+  c: OcrCorrectionRow
+  categories: GlobalCategory[]
+  actioning: string | null
+  onAction: (id: string, action: 'apply'|'skip'|'reject', opts: { categoryId?: string; keyword?: string; reviewedType?: string }) => void
+}) {
+  const suggestedKeyword = c.holderName ?? c.correctedText.split(' ')[0] ?? ''
+  const [selType, setSelType] = useState<string>('expense')
+  const [selCat,  setSelCat]  = useState<string>('')
+  const [keyword, setKeyword] = useState<string>(suggestedKeyword)
+
+  const filteredCats = categories.filter(cat => cat.type === selType)
+  const isBusy = actioning === c.id
+
+  return (
+    <div className="rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+        <span className="text-xs font-medium text-gray-700">{c.user.name}</span>
+        <span className="text-xs text-gray-400">
+          {new Date(c.createdAt).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' })}
+        </span>
+      </div>
+
+      {/* Texts */}
+      <div className="px-4 py-3 space-y-2">
+        <div>
+          <p className="text-xs text-gray-400 mb-0.5">OCR อ่านได้</p>
+          <p className="text-xs bg-red-50 text-red-800 rounded-lg px-3 py-2 font-mono break-all">{c.originalText}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-400 mb-0.5">User แก้เป็น</p>
+          <p className="text-xs bg-green-50 text-green-800 rounded-lg px-3 py-2 font-mono break-all">{c.correctedText}</p>
+        </div>
+        {c.holderName && (
+          <p className="text-xs text-gray-500">คู่ค้า: <span className="font-medium text-gray-700">{c.holderName}</span></p>
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
+        {/* Type */}
+        <div className="flex gap-1.5 flex-wrap">
+          {TYPE_OPTIONS.map(t => (
+            <button
+              key={t}
+              onClick={() => { setSelType(t); setSelCat('') }}
+              className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                selType === t ? TYPE_COLOR[t] : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              {TYPE_LABEL[t]}
+            </button>
+          ))}
+        </div>
+
+        {/* Category */}
+        <div className="flex gap-2">
+          <select
+            value={selCat}
+            onChange={e => setSelCat(e.target.value)}
+            className="flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs bg-white"
+          >
+            <option value="">— เลือกหมวดหมู่ ({filteredCats.length} หมวด) —</option>
+            {filteredCats.map(cat => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name} ({cat.keywords.length} keywords)
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Keyword */}
+        <div className="flex gap-2">
+          <input
+            value={keyword}
+            onChange={e => setKeyword(e.target.value)}
+            placeholder="Keyword ที่จะเพิ่มในหมวดหมู่"
+            className="flex-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs"
+          />
+          {selCat && (
+            <span className="text-xs text-gray-400 self-center shrink-0">
+              → {categories.find(c2 => c2.id === selCat)?.name}
+            </span>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => onAction(c.id, 'apply', { categoryId: selCat || undefined, keyword: keyword.trim() || undefined, reviewedType: selType })}
+            disabled={isBusy || !selCat}
+            className="flex-1 rounded-lg bg-blue-600 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-40"
+          >
+            {isBusy ? '...' : '✓ Apply'}
+          </button>
+          <button
+            onClick={() => onAction(c.id, 'skip', {})}
+            disabled={isBusy}
+            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+          >
+            Skip
+          </button>
+          <button
+            onClick={() => onAction(c.id, 'reject', {})}
+            disabled={isBusy}
+            className="rounded-lg border border-red-100 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 disabled:opacity-40"
+          >
+            Reject
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TrainOcrSection() {
+  const [open,        setOpen]        = useState(false)
+  const [loading,     setLoading]     = useState(false)
+  const [status,      setStatus]      = useState('pending')
+  const [corrections, setCorrections] = useState<OcrCorrectionRow[]>([])
+  const [categories,  setCategories]  = useState<GlobalCategory[]>([])
+  const [counts,      setCounts]      = useState<CorrectionCounts>({ pending: 0, applied: 0, reviewed: 0, rejected: 0 })
+  const [page,        setPage]        = useState(1)
+  const [totalPages,  setTotalPages]  = useState(1)
+  const [actioning,   setActioning]   = useState<string | null>(null)
+
+  const load = async (s: string, p: number) => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/ocr-corrections?status=${s}&page=${p}`)
+      if (!res.ok) return
+      const data = await res.json()
+      setCorrections(data.data)
+      setCategories(data.globalCategories)
+      setCounts(data.counts)
+      setPage(data.pagination.page)
+      setTotalPages(data.pagination.totalPages)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleOpen = () => { setOpen(true); load('pending', 1) }
+
+  const handleStatus = (s: string) => { setStatus(s); setPage(1); load(s, 1) }
+
+  const handleAction = async (
+    id: string,
+    action: 'apply'|'skip'|'reject',
+    opts: { categoryId?: string; keyword?: string; reviewedType?: string }
+  ) => {
+    setActioning(id)
+    try {
+      const res = await fetch(`/api/admin/ocr-corrections/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...opts }),
+      })
+      if (res.ok) {
+        setCorrections(prev => prev.filter(c => c.id !== id))
+        setCounts(prev => {
+          const next = { ...prev }
+          next[status as keyof CorrectionCounts] = Math.max(0, next[status as keyof CorrectionCounts] - 1)
+          const dest = action === 'apply' ? 'applied' : action === 'skip' ? 'reviewed' : 'rejected'
+          next[dest as keyof CorrectionCounts] += 1
+          return next
+        })
+      }
+    } finally {
+      setActioning(null) }
+  }
+
+  const TABS: Array<{ key: string; label: string; color: string }> = [
+    { key: 'pending',  label: 'รอ Review', color: 'bg-amber-500' },
+    { key: 'applied',  label: 'Applied',   color: 'bg-green-600' },
+    { key: 'reviewed', label: 'Reviewed',  color: 'bg-blue-500' },
+    { key: 'rejected', label: 'Rejected',  color: 'bg-gray-400' },
+  ]
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-gray-600">Train OCR</h2>
+          {counts.pending > 0 && (
+            <span className="inline-flex items-center justify-center h-5 px-1.5 min-w-5 rounded-full bg-amber-500 text-white text-xs font-bold">
+              {counts.pending}
+            </span>
+          )}
+        </div>
+        {!open && (
+          <button
+            onClick={handleOpen}
+            className="text-xs text-blue-600 hover:underline"
+          >
+            เปิด
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="space-y-3">
+          {/* Status tabs */}
+          <div className="flex gap-1.5 flex-wrap">
+            {TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => handleStatus(tab.key)}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                  status === tab.key
+                    ? 'bg-gray-800 text-white border-gray-800'
+                    : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                {tab.label}
+                <span className={`inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full text-white text-xs ${tab.color}`}>
+                  {counts[tab.key as keyof CorrectionCounts]}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* List */}
+          {loading ? (
+            <p className="text-sm text-gray-400 text-center py-6">กำลังโหลด...</p>
+          ) : corrections.length === 0 ? (
+            <div className="rounded-xl bg-gray-50 border border-gray-100 p-6 text-center">
+              <p className="text-sm text-gray-400">ไม่มีรายการ {status === 'pending' ? 'รอ review' : status}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {corrections.map(c => (
+                <CorrectionCard
+                  key={c.id}
+                  c={c}
+                  categories={categories}
+                  actioning={actioning}
+                  onAction={handleAction}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3">
+              <button
+                disabled={page <= 1 || loading}
+                onClick={() => { setPage(p => p - 1); load(status, page - 1) }}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 disabled:opacity-40"
+              >
+                ← ก่อนหน้า
+              </button>
+              <span className="text-xs text-gray-500">{page} / {totalPages}</span>
+              <button
+                disabled={page >= totalPages || loading}
+                onClick={() => { setPage(p => p + 1); load(status, page + 1) }}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 disabled:opacity-40"
+              >
+                ถัดไป →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
 interface EventCount  { event: string; count: number }
 interface DailyEvent  { day: string;   count: number }
 interface TopUser     { user: string;  count: number }
@@ -495,25 +791,8 @@ export default function AdminPage() {
         )}
       </section>
 
-      {/* OCR Learning Data */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-600">OCR Learning Data</h2>
-          <a
-            href="/api/ocr-corrections"
-            target="_blank"
-            className="text-xs text-blue-600 hover:underline"
-          >
-            ดูทั้งหมด (JSON)
-          </a>
-        </div>
-        <div className="rounded-xl bg-white border border-gray-100 shadow-sm p-4">
-          <p className="text-sm text-gray-500">
-            มี <span className="font-semibold text-gray-800">{data.ocrCorrectionCount}</span> รายการที่ผู้ใช้แก้ไขข้อความ OCR
-            — ใช้เป็น training data สำหรับปรับปรุง prompt ได้
-          </p>
-        </div>
-      </section>
+      {/* Train OCR */}
+      <TrainOcrSection />
 
       {/* Recent feedback */}
       <section>
