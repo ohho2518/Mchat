@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
-import { DEFAULT_TERMS } from '@/app/api/referral/terms/route'
+import { DEFAULT_REFERRAL_TERMS } from '@/lib/referral'
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL
 const SETTING_KEY = 'referral_terms'
@@ -14,7 +14,7 @@ export async function GET() {
   }
   try {
     const row = await prisma.siteSetting.findUnique({ where: { key: SETTING_KEY } })
-    return NextResponse.json(row ? JSON.parse(row.value) : DEFAULT_TERMS)
+    return NextResponse.json(row ? JSON.parse(row.value) : DEFAULT_REFERRAL_TERMS)
   } catch {
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
