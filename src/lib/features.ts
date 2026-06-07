@@ -22,7 +22,7 @@ export const PLAN_LIMITS = {
     multiUser:   false,
   },
   max: {
-    ocrPerMonth: null, // unlimited
+    ocrPerMonth: 500, // soft cap — ใช้เกินได้ด้วย ocrCredits
     historyDays: null,
     categories:  null,
     accounts:    null,
@@ -52,6 +52,13 @@ export const PLAN_PRICES: Record<Plan, { monthly: number; yearly: number }> = {
   pro:  { monthly: 99,  yearly: 990  },
   max:  { monthly: 249, yearly: 2490 },
 }
+
+export const CREDIT_PACKS = [
+  { credits: 100, price: 29 },
+  { credits: 300, price: 79,  popular: true },
+  { credits: 500, price: 119 },
+] as const
+export type CreditPack = typeof CREDIT_PACKS[number]
 
 // Thai timezone month string (UTC+7) — used for OCR quota keying
 export function getThaiMonth(): string {

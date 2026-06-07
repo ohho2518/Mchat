@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
 import { z } from 'zod'
+import { logAudit } from '@/lib/audit'
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL
 
@@ -45,6 +46,16 @@ export async function PATCH(
         status:     action === 'approve' ? 'approved' : 'canceled',
         approvedAt: action === 'approve' ? new Date() : null,
       },
+    })
+
+    logAudit({
+      actorId:    session.user.id,
+      actorEmail: session.user.email!,
+      action:     `admin.commission.${action}`,
+      targetType: 'commission',
+      targetId:   id,
+      metadata:   { referrerUserId: commission.referrerUserId, amount: commission.amount },
+      ip:         req.headers.get('x-forwarded-for')?.split(',')[0]?.trim(),
     })
 
     return NextResponse.json(updated)

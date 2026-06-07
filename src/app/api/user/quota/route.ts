@@ -16,16 +16,24 @@ export async function GET() {
     const month    = getThaiMonth()
     const ocrLimit = PLAN_LIMITS[plan].ocrPerMonth
 
-    const quota = await prisma.usageQuota.findUnique({
-      where: { userId_month: { userId: session.user.id, month } },
-      select: { ocrCount: true },
-    })
+    const [quota, user] = await Promise.all([
+      prisma.usageQuota.findUnique({
+        where:  { userId_month: { userId: session.user.id, month } },
+        select: { ocrCount: true },
+      }),
+      prisma.user.findUnique({
+        where:  { id: session.user.id },
+        select: { ocrCredits: true, emailVerified: true },
+      }),
+    ])
 
     return NextResponse.json({
       plan,
       month,
-      ocrCount: quota?.ocrCount ?? 0,
+      ocrCount:      quota?.ocrCount  ?? 0,
       ocrLimit,
+      ocrCredits:    user?.ocrCredits ?? 0,
+      emailVerified: !!user?.emailVerified,
     })
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

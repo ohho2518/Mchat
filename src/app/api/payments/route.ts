@@ -4,12 +4,22 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
 import { z } from 'zod'
 
-const CreatePaymentSchema = z.object({
-  plan:   z.enum(['pro', 'max']),
-  months: z.number().int().min(1).max(12),
-  amount: z.number().min(1),
-  method: z.enum(['promptpay', 'manual']).default('promptpay'),
-})
+const CreatePaymentSchema = z.union([
+  z.object({
+    plan:    z.enum(['pro', 'max']),
+    months:  z.number().int().min(1).max(12),
+    amount:  z.number().min(1),
+    method:  z.enum(['promptpay', 'manual']).default('manual'),
+    credits: z.undefined(),
+  }),
+  z.object({
+    credits: z.number().int().min(1),
+    amount:  z.number().min(1),
+    method:  z.enum(['promptpay', 'manual']).default('manual'),
+    plan:    z.undefined(),
+    months:  z.undefined(),
+  }),
+])
 
 export async function GET() {
   try {
@@ -43,14 +53,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
     }
 
-    const { plan, months, amount, method } = parsed.data
+    const { amount, method } = parsed.data
+    const plan    = 'plan'    in parsed.data ? parsed.data.plan    : undefined
+    const months  = 'months'  in parsed.data ? parsed.data.months  : undefined
+    const credits = 'credits' in parsed.data ? parsed.data.credits : undefined
 
     // Check for existing pending payment — don't allow duplicate submissions
     const existing = await prisma.payment.findFirst({
-      where: {
-        userId: session.user.id,
-        status: 'pending',
-      },
+      where: { userId: session.user.id, status: 'pending' },
     })
     if (existing) {
       return NextResponse.json({
@@ -62,8 +72,9 @@ export async function POST(req: Request) {
     const payment = await prisma.payment.create({
       data: {
         userId: session.user.id,
-        plan,
-        months,
+        plan:    plan ?? null,
+        months:  months ?? 1,
+        credits: credits ?? null,
         amount,
         method,
         status: 'pending',

@@ -24,7 +24,7 @@ interface AdminUser {
   _count: { transactions: number }
 }
 interface PendingPayment {
-  id: string; plan: Plan; months: number; amount: number; method: string; createdAt: string
+  id: string; plan: Plan | null; months: number; credits: number | null; amount: number; method: string; createdAt: string
   user: { id: string; name: string; email: string; plan: Plan }
 }
 interface AdminCommission {
@@ -51,6 +51,68 @@ const EVENT_LABELS: Record<string, string> = {
 
 const CATEGORY_LABEL: Record<string, string> = {
   bug: 'บัค', feature: 'ฟีเจอร์', general: 'ทั่วไป',
+}
+
+function CreditGranter({ userId }: { userId: string }) {
+  const [open,    setOpen]    = useState(false)
+  const [amount,  setAmount]  = useState(100)
+  const [loading, setLoading] = useState(false)
+
+  const grant = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/credits`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ credits: amount }),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      alert(`เติมเครดิตสำเร็จ — คงเหลือ ${data.ocrCredits} ครั้ง`)
+      setOpen(false)
+    } catch {
+      alert('เติมเครดิตไม่สำเร็จ')
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div>
+      <button onClick={() => setOpen(!open)} className="text-xs text-purple-600 hover:underline">
+        เติมเครดิต OCR
+      </button>
+      {open && (
+        <div className="mt-2 p-3 rounded-lg bg-purple-50 border border-purple-200 space-y-2">
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-600 shrink-0">จำนวน</label>
+            <select
+              value={amount}
+              onChange={e => setAmount(Number(e.target.value))}
+              className="flex-1 rounded-lg border border-gray-200 px-2 py-1 text-xs"
+            >
+              {[50, 100, 200, 300, 500].map(n => (
+                <option key={n} value={n}>{n} ครั้ง</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={grant}
+              disabled={loading}
+              className="flex-1 rounded-lg bg-purple-600 py-1.5 text-xs font-medium text-white hover:bg-purple-700 disabled:opacity-50"
+            >
+              {loading ? '...' : 'เติมเครดิต'}
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              className="flex-1 rounded-lg border border-gray-200 py-1.5 text-xs text-gray-600"
+            >
+              ยกเลิก
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function UserPlanEditor({ user, onUpdated }: { user: AdminUser; onUpdated: (u: AdminUser) => void }) {
@@ -198,9 +260,11 @@ export default function AdminPage() {
       const res = await fetch(`/api/admin/payments/${payment.id}`, { method: 'PATCH' })
       if (res.ok) {
         loadPending()
-        setUsers(prev => prev.map(u =>
-          u.id === payment.user.id ? { ...u, plan: payment.plan } : u
-        ))
+        if (!payment.credits && payment.plan) {
+          setUsers(prev => prev.map(u =>
+            u.id === payment.user.id ? { ...u, plan: payment.plan! } : u
+          ))
+        }
       }
     } finally {
       setConfirmingId(null)
@@ -303,16 +367,22 @@ export default function AdminPage() {
                     <p className="text-xs text-gray-500">{p.user.email}</p>
                   </div>
                   <div className="text-right">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border
-                      ${PLAN_COLORS[p.plan].bg} ${PLAN_COLORS[p.plan].text} ${PLAN_COLORS[p.plan].border}`}>
-                      {PLAN_LABELS[p.plan]}
-                    </span>
+                    {p.credits ? (
+                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border bg-purple-100 text-purple-700 border-purple-200">
+                        เครดิต {p.credits} ครั้ง
+                      </span>
+                    ) : p.plan ? (
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border
+                        ${PLAN_COLORS[p.plan].bg} ${PLAN_COLORS[p.plan].text} ${PLAN_COLORS[p.plan].border}`}>
+                        {PLAN_LABELS[p.plan]}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-gray-600">
                   <span>฿{Number(p.amount).toLocaleString()}</span>
                   <span>·</span>
-                  <span>{p.months} เดือน</span>
+                  {p.credits ? <span>เครดิต OCR</span> : <span>{p.months} เดือน</span>}
                   <span>·</span>
                   <span>{p.method === 'promptpay' ? 'PromptPay' : 'Manual'}</span>
                   <span className="ml-auto text-gray-400">
@@ -410,12 +480,15 @@ export default function AdminPage() {
                     หมดอายุ: {new Date(u.planExpiresAt).toLocaleDateString('th-TH')}
                   </p>
                 )}
-                <UserPlanEditor
-                  user={u}
-                  onUpdated={(updated) =>
-                    setUsers(prev => prev.map(x => x.id === updated.id ? { ...x, ...updated } : x))
-                  }
-                />
+                <div className="flex gap-4">
+                  <UserPlanEditor
+                    user={u}
+                    onUpdated={(updated) =>
+                      setUsers(prev => prev.map(x => x.id === updated.id ? { ...x, ...updated } : x))
+                    }
+                  />
+                  <CreditGranter userId={u.id} />
+                </div>
               </div>
             ))}
           </div>

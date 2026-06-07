@@ -24,7 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Auth | NextAuth.js v4 (JWT strategy, credentials only) |
 | Database | Supabase PostgreSQL + Prisma ORM v6 |
 | Voice | Web Speech API built-in (lang=th-TH) |
-| OCR | Anthropic Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) |
+| OCR | OpenAI GPT-4o-mini (`gpt-4o-mini`, vision detail:low) |
 | Export | xlsx + papaparse |
 | PWA | public/manifest.json + public/sw.js + src/app/PwaRegister.tsx |
 | Package manager | npm |
@@ -44,47 +44,93 @@ src/
     dashboard/page.tsx
     transactions/page.tsx
     categories/page.tsx
+    accounts/page.tsx       ← Account CRUD
+    transfers/page.tsx      ← Transfer ระหว่างบัญชี
+    debts/page.tsx          ← Debt Tracking (ลูกหนี้/เจ้าหนี้)
     settings/page.tsx       ← profile edit, password change, PWA install
+    pricing/page.tsx        ← plan comparison + PaymentModal (Omise + manual)
+    referral/page.tsx       ← referral dashboard: code, stats, payout
+    admin/page.tsx          ← admin only: analytics, users, payments, commissions
+    download/page.tsx       ← landing page (public, ไม่ต้อง auth)
+    ref/[code]/page.tsx     ← referral redirect → /download (public)
     api/
       auth/[...nextauth]/   ← NextAuth handler
       auth/register/        ← POST สร้าง account ใหม่
       user/                 ← PATCH update profile/password
+      user/quota/           ← GET OCR quota ของ user
       parser/parse/         ← POST text → ParsedTransaction (ไม่ write DB)
-      parser/ocr/           ← POST image → { text, holderName } (OCR สลิป, query Account names จาก DB)
+      parser/ocr/           ← POST image → { text, holderName } (OCR สลิป)
       transactions/         ← GET list, POST create
       transactions/[id]/    ← PUT update, DELETE soft-delete
       categories/           ← GET, POST
       categories/[id]/      ← PUT, DELETE
+      accounts/             ← GET, POST
+      accounts/[id]/        ← PUT, DELETE
+      transfers/            ← GET, POST
+      transfers/[id]/       ← PUT, DELETE
+      debts/                ← GET, POST
+      debts/[id]/           ← PUT, DELETE
       dashboard/summary/    ← GET summary (today + month)
       dashboard/daily-cashflow/
       dashboard/category-expense/
+      events/               ← POST fire-and-forget event tracking
+      feedback/             ← POST user feedback (rating + ข้อความ)
+      ocr-corrections/      ← POST correction, GET admin export
+      payments/             ← POST create payment, GET history
+      payments/info/        ← GET promptpayPhone + omisePublicKey
+      omise/charge/         ← POST create Omise charge (PromptPay/Card)
+      omise/status/         ← GET poll payment status
+      webhooks/omise/       ← POST Omise webhook → activate plan
+      referral/code/        ← GET lazy-create referral code
+      referral/stats/       ← GET clicks/signups/conversions/commissions
+      referral/commissions/ ← GET commission history ของ user
+      referral/payout/      ← POST ขอถอนเงิน, GET ประวัติ
+      referral/terms/       ← GET public referral terms
+      ref/click/            ← POST increment referral click counter
+      admin/analytics/      ← GET admin stats (30 วัน)
+      admin/users/          ← GET list users
+      admin/users/[id]/plan/ ← PATCH เปลี่ยน plan
+      admin/payments/       ← GET pending payments
+      admin/payments/[id]/  ← PATCH confirm/reject
+      admin/settings/       ← GET/PATCH referral terms editor
+      admin/referral/commissions/      ← GET all commissions
+      admin/referral/commissions/[id]/ ← PATCH approve/cancel
+      admin/referral/payouts/          ← GET all payout requests
+      admin/referral/payouts/[id]/     ← PATCH pay/reject
 
   components/
-    layout/    AppShell, Header, BottomNav
-    chat/      ChatInput, ChatMessage, ParsedTransactionCard, VoiceInputButton, SlipUploadButton
+    layout/    AppShell, Header, BottomNav, PageTracker
+    chat/      ChatInput, ChatMessage, ParsedTransactionCard, VoiceInputButton, SlipUploadButton, OcrReviewModal
     dashboard/ SummaryCard, PeriodSelector, IncomeExpenseChart, CashflowLineChart, CategoryPieChart
     transactions/ TransactionTable, TransactionFilter, TransactionForm
     categories/  CategoryList, CategoryForm
-    ui/        Button, Card, Input, Badge, Modal, Spinner, EmptyState, ConfirmDialog
+    ui/        Button, Card, Input, Badge, Modal, Spinner, EmptyState, ConfirmDialog, UpgradePrompt, FeedbackButton
 
   lib/
     auth.ts                 ← NextAuth config
+    features.ts             ← PLAN_LIMITS, PLAN_LABELS, PLAN_COLORS, PLAN_PRICES
+    referral.ts             ← generateReferralCode()
+    commission.ts           ← COMMISSION_TABLE, getPlanCode, createCommissionAfterPayment()
+    omise.ts                ← Omise client wrapper (createPromptPayCharge, createCardCharge)
+    promptpay.ts            ← EMVCo PromptPay QR payload generator (CRC-16)
     parser/
       parseTransactionText.ts  ← entry point
       normalize.ts, amountParser.ts, dateParser.ts
       typeDetector.ts, categoryDetector.ts, paymentMethodDetector.ts
     db/prisma.ts            ← Prisma singleton
     export/exportExcel.ts, exportCsv.ts
+    analytics/track.ts      ← trackEvent() fire-and-forget
     utils/cn.ts, password.ts
     validators/transaction.ts, category.ts  ← Zod schemas (shared API+client)
 
   types/transaction.ts, dashboard.ts
   data/seedCategories.ts
 
-middleware.ts               ← withAuth: ป้องกันทุก route ยกเว้น /login, /api/auth
+middleware.ts               ← withAuth: public routes = /login, /download, /ref/*, /api/auth/**
 prisma/schema.prisma, seed.ts, migrations/
 public/manifest.json, sw.js, icons/
-tests/parser/parseTransactionText.test.ts
+tests/parser/parseTransactionText.test.ts  ← 44 test cases
+tests/e2e/                  ← Playwright E2E (19 tests)
 ```
 
 ---
@@ -207,9 +253,10 @@ User กดปุ่มกล้อง → เลือกรูป/ถ่าย
 - Soft delete เท่านั้น: `status = 'deleted'` (ห้าม hard delete Transaction)
 - ทุก query filter: `status: { not: 'deleted' }`
 - Transfer/Debt type ไม่นับใน dashboard sum (filter `type: { in: ['income','expense'] }`)
-- Schema มี model: `User`, `Account`, `Category`, `CategoryKeyword`, `Transaction`, `Transfer`, `Debt`
+- Schema มี model: `User`, `Account`, `Category`, `CategoryKeyword`, `Transaction`, `Transfer`, `Debt`, `AppEvent`, `Feedback`, `OcrCorrection`, `ReferralCode`, `Referral`, `Commission`, `PayoutRequest`, `SiteSetting`, `UsageQuota`, `Payment`
 - `Transaction` มี field `holderName` (String?) — ชื่อคู่ค้าจากสลิป OCR
-- `Account`, `Transfer`, `Debt` model มีใน schema แต่ยังไม่มี CRUD API/UI รองรับ
+- `User` มี field `plan` (FREE/PRO/MAX), `planExpiresAt`
+- CRUD API+UI ครบ: accounts, transfers, debts
 
 ---
 
@@ -269,6 +316,12 @@ User กดปุ่มกล้อง → เลือกรูป/ถ่าย
 | แก้ parser logic | `src/lib/parser/*.ts` → รัน test ด้วย `npx tsx tests/parser/...` |
 | แก้ dashboard chart | `src/components/dashboard/` + `src/app/api/dashboard/*/route.ts` |
 | Export ข้อมูล | `src/lib/export/exportExcel.ts` หรือ `exportCsv.ts` |
+| แก้ plan limits | `src/lib/features.ts` → PLAN_LIMITS |
+| แก้ commission rates | `src/lib/commission.ts` → COMMISSION_TABLE |
+| แก้ Omise integration | `src/lib/omise.ts` + `src/app/api/omise/` |
+| แก้ referral logic | `src/lib/referral.ts` + `src/app/api/referral/` |
+| แก้ admin panel | `src/app/admin/page.tsx` + `src/app/api/admin/` |
+| ดู event tracking | `src/lib/analytics/track.ts` + `src/app/api/events/route.ts` |
 
 ---
 
@@ -284,15 +337,41 @@ User กดปุ่มกล้อง → เลือกรูป/ถ่าย
 
 ---
 
+## Important Files
+
+| ไฟล์ | ความสำคัญ |
+|---|---|
+| `src/lib/parser/parseTransactionText.ts` | parser entry point — core business logic |
+| `src/lib/auth.ts` | NextAuth config |
+| `src/lib/features.ts` | PLAN_LIMITS, feature gates |
+| `src/lib/omise.ts` | Omise payment integration |
+| `src/lib/commission.ts` | Referral commission logic |
+| `src/app/chat/page.tsx` | main user flow: parse → confirm → save |
+| `src/app/pricing/page.tsx` | PaymentModal (Omise + manual PromptPay) |
+| `src/app/referral/page.tsx` | Referral dashboard |
+| `src/app/admin/page.tsx` | Admin panel (auth: ADMIN_EMAIL) |
+| `middleware.ts` | auth guard (route protection) |
+| `prisma/schema.prisma` | DB schema ครบ |
+| `src/data/seedCategories.ts` | parser keywords + default categories |
+| `src/lib/validators/transaction.ts` | Zod schemas ใช้ทั้ง API + frontend |
+| `src/app/api/parser/ocr/route.ts` | OCR slip — prompt + holderName logic |
+| `tests/parser/parseTransactionText.test.ts` | 44 test cases |
+| `public/sw.js` | PWA service worker |
+
+---
+
 ## Reference Docs
 
 | เอกสาร | ตำแหน่ง |
 |---|---|
-| แผนพัฒนา | `docs/plan/DEV_PLAN.md` |
+| สถานะโปรเจกต์ | `PROJECT_STATUS.md` |
+| Changelog | `CHANGELOG.md` |
+| Project Context | `docs/MChat_PROJECT_CONTEXT.md` |
 | Parser Logic | `docs/plan/PARSER_GUIDE.md` |
 | API Reference | `docs/api/API_REFERENCE.md` |
 | DB Schema | `docs/db/SCHEMA.md` |
 | Design System | `docs/design/DESIGN_SYSTEM.md` |
 | Parser Test Cases | `tests/parser/TEST_CASES.md` |
+| แผนพัฒนา (archived) | `docs/plan/DEV_PLAN.md` |
 
 *MChat | มิถุนายน 2569*

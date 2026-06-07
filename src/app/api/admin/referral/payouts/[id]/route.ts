@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
 import { z } from 'zod'
+import { logAudit } from '@/lib/audit'
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL
 
@@ -51,6 +52,16 @@ export async function PATCH(
         data: { status: 'rejected', adminNote: adminNote ?? null },
       })
     }
+
+    logAudit({
+      actorId:    session.user.id,
+      actorEmail: session.user.email!,
+      action:     `admin.payout.${action}`,
+      targetType: 'payout',
+      targetId:   id,
+      metadata:   { userId: payout.userId, amount: payout.amount, adminNote },
+      ip:         req.headers.get('x-forwarded-for')?.split(',')[0]?.trim(),
+    })
 
     return NextResponse.json({ ok: true })
   } catch {

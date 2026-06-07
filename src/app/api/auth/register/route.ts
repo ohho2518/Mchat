@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/db/prisma'
 import { hashPassword } from '@/lib/utils/password'
 import { generateReferralCode } from '@/lib/referral'
+import { sendEmail, buildVerifyEmailHtml } from '@/lib/email'
 
 const RegisterSchema = z.object({
   name:    z.string().min(1).max(50),
@@ -37,8 +38,8 @@ async function generateUniqueCode(name: string): Promise<string> {
 
 export async function POST(req: Request) {
   try {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-    if (!checkRegisterRate(ip)) {
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    if (!checkRegisterRate(clientIp)) {
       return NextResponse.json({ error: 'ลองใหม่ในอีกสักครู่' }, { status: 429 })
     }
 
@@ -64,12 +65,15 @@ export async function POST(req: Request) {
       })
     }
 
-    const passwordHash = await hashPassword(password)
-    const myCode = await generateUniqueCode(name)
+    const passwordHash     = await hashPassword(password)
+    const myCode           = await generateUniqueCode(name)
+    const emailVerifyToken = crypto.randomUUID()
 
-    // Create user + their referral code in one transaction
+    const ip        = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    const userAgent = req.headers.get('user-agent') ?? undefined
+
     const user = await prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({ data: { name, email, passwordHash } })
+      const newUser = await tx.user.create({ data: { name, email, passwordHash, emailVerifyToken } })
 
       // Give new user their own referral code
       await tx.referralCode.create({
@@ -87,8 +91,33 @@ export async function POST(req: Request) {
         })
       }
 
+      // Record PDPA consent
+      await tx.userConsent.createMany({
+        data: [
+          { userId: newUser.id, type: 'privacy_policy', version: '2026-06', ip, userAgent },
+          { userId: newUser.id, type: 'terms',          version: '2026-06', ip, userAgent },
+        ],
+      })
+
       return newUser
     })
+
+    // Send verification email (fire-and-forget)
+    const baseUrl   = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
+    const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${emailVerifyToken}`
+    sendEmail({
+      to:      email,
+      subject: 'ยืนยันอีเมล MChat ของคุณ',
+      html:    buildVerifyEmailHtml(name, verifyUrl),
+    }).catch(() => {})
+
+    // If no email provider → auto-verify so user isn't stuck
+    if (!process.env.RESEND_API_KEY) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data:  { emailVerified: new Date(), emailVerifyToken: null },
+      })
+    }
 
     return NextResponse.json({ success: true, userId: user.id }, { status: 201 })
   } catch {

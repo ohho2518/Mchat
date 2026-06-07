@@ -59,8 +59,8 @@ export async function POST(req: Request) {
       where: { omiseChargeId: charge.id },
     })
 
-    // Not found or already processed (idempotent)
-    if (!payment || payment.status === 'paid') {
+    // Not found, already processed, or credit purchase (Omise only handles plan upgrades)
+    if (!payment || payment.status === 'paid' || !payment.plan) {
       return NextResponse.json({ ok: true })
     }
 

@@ -12,12 +12,13 @@ function LoginForm() {
   const searchParams = useSearchParams()
 
   const [mode,     setMode]     = useState<Mode>(searchParams.get('mode') === 'register' ? 'register' : 'login')
-  const [name,     setName]     = useState('')
-  const [email,    setEmail]    = useState('')
-  const [password, setPassword] = useState('')
-  const [refCode,  setRefCode]  = useState('')
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState<string | null>(null)
+  const [name,          setName]          = useState('')
+  const [email,         setEmail]         = useState('')
+  const [password,      setPassword]      = useState('')
+  const [refCode,       setRefCode]       = useState('')
+  const [acceptTerms,   setAcceptTerms]   = useState(false)
+  const [loading,       setLoading]       = useState(false)
+  const [error,         setError]         = useState<string | null>(null)
 
   // Auto-fill referral code from localStorage (set by /ref/:code)
   useEffect(() => {
@@ -34,6 +35,11 @@ function LoginForm() {
 
     try {
       if (mode === 'register') {
+        if (!acceptTerms) {
+          setError('กรุณายอมรับเงื่อนไขการใช้งานและนโยบายความเป็นส่วนตัวก่อน')
+          setLoading(false)
+          return
+        }
         const res = await fetch('/api/auth/register', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -110,6 +116,24 @@ function LoginForm() {
               onChange={(e) => setRefCode(e.target.value.toUpperCase())}
               placeholder="เช่น WINIT001"
             />
+          )}
+
+          {mode === 'register' && (
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={acceptTerms}
+                onChange={(e) => setAcceptTerms(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-xs text-gray-600 leading-relaxed">
+                ฉันได้อ่านและยอมรับ{' '}
+                <a href="/terms" target="_blank" className="text-blue-600 hover:underline">เงื่อนไขการใช้งาน</a>
+                {' '}และ{' '}
+                <a href="/privacy-policy" target="_blank" className="text-blue-600 hover:underline">นโยบายความเป็นส่วนตัว</a>
+                {' '}รวมถึงยินยอมให้ MChat เก็บข้อมูลตามที่ระบุไว้ใน PDPA
+              </span>
+            </label>
           )}
 
           {error && (

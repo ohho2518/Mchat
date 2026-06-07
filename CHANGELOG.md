@@ -4,6 +4,97 @@
 
 ---
 
+## 2026-06-07
+
+### Security Sprint 2 — S06–S09
+
+- Added: **Email Verification (S08)** — หลัง register ระบบส่ง email ยืนยัน (ผ่าน Resend API)
+  - `/api/auth/verify-email?token=xxx` — ยืนยัน token → mark `emailVerified` → redirect ไป /settings
+  - `/settings` — banner เตือน "อีเมลยังไม่ได้รับการยืนยัน" ถ้ายังไม่ verify
+  - ถ้าไม่มี `RESEND_API_KEY` → auto-verify ให้ (dev mode ไม่ต้องตั้งค่า)
+- Added: **OCR Improvement Consent Toggle (S06)** — `/settings` มี toggle ให้ user เลือกว่าจะ opt-in แชร์ข้อมูล OCR corrections เพื่อพัฒนาระบบหรือไม่ (default: off)
+  - `GET/PATCH /api/user/consent` — อ่าน/แก้ consent ของ user
+  - `/api/ocr-corrections POST` — ตรวจ consent ก่อนบันทึก; ถ้าไม่ consent → skip silently
+- Added: **Audit Log (S07)** — บันทึกทุก admin action ลง `AuditLog` table
+  - `src/lib/audit.ts` — `logAudit()` fire-and-forget (ไม่ block main flow)
+  - Actions ที่ log: payment confirm/reject, plan change, commission approve/cancel, payout pay/reject, grant credits
+- Added: **Security Headers + CSP (S09)** — `next.config.ts` ส่ง headers ทุก request
+  - `X-Frame-Options: SAMEORIGIN` — ป้องกัน clickjacking
+  - `X-Content-Type-Options: nosniff` — ป้องกัน MIME sniffing
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+  - `Permissions-Policy: camera=(), microphone=(self), geolocation=()`
+  - `Content-Security-Policy` — whitelist Omise CDN, Google Fonts; block `object-src`
+
+### Files Changed
+`next.config.ts`, `prisma/schema.prisma` (+AuditLog, +emailVerified, +emailVerifyToken),
+`src/lib/audit.ts` (new), `src/lib/email.ts` (new),
+`src/app/api/auth/verify-email/route.ts` (new), `src/app/api/user/consent/route.ts` (new),
+`src/app/api/admin/users/[id]/credits/route.ts` (new),
+`src/app/api/admin/payments/[id]/route.ts`, `src/app/api/admin/users/[id]/plan/route.ts`,
+`src/app/api/admin/referral/commissions/[id]/route.ts`, `src/app/api/admin/referral/payouts/[id]/route.ts`,
+`src/app/api/ocr-corrections/route.ts`, `src/app/api/auth/register/route.ts`,
+`src/app/api/user/quota/route.ts`, `src/app/settings/page.tsx`, `.env.example`
+
+---
+
+### Security Sprint 1 — S01–S05 + PDPA
+
+- Added: **PDPA Consent on Register (S03)** — checkbox "ยอมรับเงื่อนไข + นโยบาย" ใน Register form (required)
+  - `UserConsent` model — บันทึก consent timestamp, IP, UserAgent ทุกครั้งที่ register
+- Added: **`/privacy-policy` page (S04)** — นโยบายความเป็นส่วนตัว 7 sections (PDPA compliant)
+- Added: **`/terms` page (S04)** — เงื่อนไขการใช้งาน 10 sections (Referral fraud, payment policy, etc.)
+- Added: **`middleware.ts` (S05)** — Admin IP Allowlisting ผ่าน `ADMIN_IP_ALLOWLIST` env var
+  - `/admin` + `/api/admin/*` → redirect ไป /login ถ้า IP ไม่อยู่ใน allowlist
+  - Public routes: `/download`, `/privacy-policy`, `/terms`, `/ref/`, `/api/ref/`, `/api/referral/terms`
+- Updated: `.env.example` — เพิ่ม `OMISE_WEBHOOK_SECRET`, `ADMIN_IP_ALLOWLIST`, `RESEND_API_KEY`
+
+### Files Changed
+`middleware.ts` (new), `src/app/privacy-policy/page.tsx` (new), `src/app/terms/page.tsx` (new),
+`src/app/login/page.tsx`, `src/app/api/auth/register/route.ts`, `prisma/schema.prisma` (+UserConsent)
+
+---
+
+### OCR Credit System
+
+- Changed: **MAX plan** — OCR จาก unlimited → **500 ครั้ง/เดือน** (soft cap)
+- Added: **OCR Credit Packs** — ซื้อเครดิตเพิ่มเมื่อ quota หมด (ไม่มีวันหมดอายุ)
+  - 3 packs: 100 ครั้ง/฿29 · 300 ครั้ง/฿79 · 500 ครั้ง/฿119
+  - `/pricing` — section "เติมเครดิต OCR" + CreditModal (manual PromptPay flow)
+  - `/settings` — แสดง "เครดิต OCR เสริม: X ครั้ง" badge สีม่วงเมื่อมีเครดิตคงเหลือ
+- Updated: `POST /api/payments` — รองรับ `{ credits, amount, method }` นอกเหนือจาก plan purchase
+- Updated: `PATCH /api/admin/payments/[id]` — เมื่อ confirm credit payment → increment `user.ocrCredits`
+- Added: `PATCH /api/admin/users/[id]/credits` — admin grant credits โดยตรง (1–10,000)
+- Added: **Admin CreditGranter** — dropdown 50/100/200/300/500 ในหน้า User Management
+
+### Files Changed
+`src/lib/features.ts`, `prisma/schema.prisma` (+ocrCredits on User, Payment.plan nullable, +credits field),
+`src/app/api/parser/ocr/route.ts`, `src/app/api/user/quota/route.ts`,
+`src/app/api/payments/route.ts`, `src/app/api/admin/payments/[id]/route.ts`,
+`src/app/api/admin/users/[id]/credits/route.ts` (new), `src/app/api/webhooks/omise/route.ts`,
+`src/app/pricing/page.tsx`, `src/app/settings/page.tsx`, `src/app/admin/page.tsx`
+
+---
+
+### Referral UX Polish
+
+- Added: **QR Code ใน `/referral`** — แสดง QR code ของ referral link ให้แชร์ + ปุ่ม Download
+- Added: **`/download` landing page** — หน้าสาธารณะ (ไม่ต้อง login): hero, features, PWA install guide, ปุ่ม register
+- Changed: **`/ref/[code]`** — redirect ไป `/download` (แทน `/login`) พร้อม badge "เพื่อนแนะนำมา"
+- Added: **Referral tab ใน BottomNav** — ไอคอน Gift เป็น tab ที่ 4 (BottomNav ครบ 5 tabs)
+- Added: **Header chip "แนะนำเพื่อน"** — chip สีเหลืองทอง ทุกหน้าที่ login → `/referral`
+- Added: **Referral Terms Editor ใน `/admin`** — แก้ไข commission rates, holdDays, minPayout, payoutDay, extraNote
+- Added: `GET /api/referral/terms` — public endpoint คืน terms (อ่านจาก `SiteSetting` DB)
+- Added: `GET/PATCH /api/admin/settings` — admin อ่าน/แก้ไข site settings
+
+### Files Changed
+`src/app/referral/page.tsx`, `src/app/download/page.tsx` (new),
+`src/app/ref/[code]/page.tsx`, `src/components/layout/BottomNav.tsx`,
+`src/components/layout/Header.tsx`, `src/app/admin/page.tsx`,
+`src/app/api/referral/terms/route.ts` (new), `src/app/api/admin/settings/route.ts` (new),
+`prisma/schema.prisma` (+SiteSetting model)
+
+---
+
 ## 2026-06-06
 
 ### Features — Referral & Affiliate System Phase 4–5 (User Dashboard + Admin Management)

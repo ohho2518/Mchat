@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
 import { z } from 'zod'
+import { logAudit } from '@/lib/audit'
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL
 
@@ -33,7 +34,6 @@ export async function PATCH(
 
     const { plan, months, amount, method, note } = parsed.data
 
-    // Calculate new planExpiresAt
     let planExpiresAt: Date | null = null
     if (plan !== 'free' && months > 0) {
       const base = new Date()
@@ -48,18 +48,19 @@ export async function PATCH(
         select: { id: true, name: true, email: true, plan: true, planExpiresAt: true },
       }),
       prisma.payment.create({
-        data: {
-          userId: id,
-          plan,
-          months,
-          amount,
-          method,
-          note,
-          status: 'paid',
-          paidAt: new Date(),
-        },
+        data: { userId: id, plan, months, amount, method, note, status: 'paid', paidAt: new Date() },
       }),
     ])
+
+    logAudit({
+      actorId:    session.user.id,
+      actorEmail: session.user.email!,
+      action:     'admin.user.plan_change',
+      targetType: 'user',
+      targetId:   id,
+      metadata:   { plan, months, amount, method },
+      ip:         req.headers.get('x-forwarded-for')?.split(',')[0]?.trim(),
+    })
 
     return NextResponse.json(user)
   } catch {

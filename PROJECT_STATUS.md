@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-2026-06-06 EOD — Referral system ครบ + Landing page + BottomNav
+2026-06-07 — Security Sprint 2 (S06–S09) + OCR Credit System
 
 ---
 
@@ -69,6 +69,30 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
   - `PATCH /api/admin/referral/payouts/[id]` — pay (mark commissions paid) / reject
   - `/referral` page — referral dashboard: code card + share, stats, payout form, commission history
   - `/admin` page — Commissions + Payout Requests sections with approve/cancel/pay/reject actions
+- [x] **Security Sprint 2 — Medium Priority (2026-06-07)**:
+  - S06: OCR Improvement Consent — PATCH/GET /api/user/consent, consent check ใน /api/ocr-corrections POST, toggle ใน /settings
+  - S07: Audit Log — `AuditLog` model, `src/lib/audit.ts`, logAudit() ใน: admin payments confirm/reject, admin plan change, admin commission approve/cancel, admin payout pay/reject, admin grant credits
+  - S08: Email Verification — `User.emailVerified` + `emailVerifyToken`, `src/lib/email.ts` (Resend), register API ส่ง verify email, GET /api/auth/verify-email endpoint, settings banner + Suspense fix, auto-verify ถ้าไม่มี RESEND_API_KEY
+  - S09: Security Headers + CSP — `next.config.ts` ใหม่ (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, Content-Security-Policy)
+- [x] **Security Sprint 1 — Critical (2026-06-07)**:
+  - S01: Omise Webhook Signature Verification — ✅ implement แล้วก่อนหน้า (HMAC SHA1 + base64 + Omise API fallback)
+  - S02: Supabase RLS — SQL script พร้อม (รัน manual ใน Supabase Dashboard)
+  - S03: PDPA Consent on Register — `UserConsent` model, checkbox ใน /login, บันทึก consent ใน register API
+  - S04: /privacy-policy + /terms pages — สร้างแล้ว (static, public route)
+  - S05: Admin IP Allowlisting — `middleware.ts` สร้างใหม่ + `ADMIN_IP_ALLOWLIST` env var
+  - Middleware: สร้าง `middleware.ts` ใหม่ (withAuth + public routes + admin IP gate)
+- [x] **OCR Credit System (2026-06-07)**:
+  - MAX plan: `ocrPerMonth` เปลี่ยนจาก unlimited → 500/เดือน (soft cap)
+  - `User.ocrCredits` — extra credits ที่ซื้อเพิ่มได้ ไม่มีวันหมดอายุ ไม่ reset ทุกเดือน
+  - OCR route: fallback ไป `ocrCredits` อัตโนมัติเมื่อ monthly quota หมด
+  - `CREDIT_PACKS` — 3 pack: 100/฿29, 300/฿79, 500/฿119
+  - `/pricing` — Credit packs section + CreditModal (manual PromptPay)
+  - `POST /api/payments` — รองรับ `{ credits, amount, method }` (credit purchase)
+  - `PATCH /api/admin/payments/[id]` — grant credits เมื่อ confirm credit payment
+  - `PATCH /api/admin/users/[id]/credits` — admin grant credits โดยตรง
+  - `/settings` — แสดง credit balance
+  - Admin — CreditGranter component ใน User Management + แสดง credit payment ใน pending
+  - CLAUDE.md — แก้ OCR model จาก Claude Haiku → OpenAI gpt-4o-mini
 - [x] **Referral UX Polish (2026-06-06)**:
   - QR code + Download button ใน `/referral` page
   - `/download` landing page — hero, features, PWA install, register CTA
@@ -143,13 +167,27 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 
 ## Next Tasks
 
-เรียงตามลำดับความสำคัญ:
-
+### 🚀 Production QA (ทำก่อน)
 1. **QA ทดสอบ Referral flow** — Scan QR → /download → register → commission hook ทำงาน
 2. **ตั้งค่า Omise env vars บน Vercel** — `OMISE_SECRET_KEY` + `OMISE_PUBLIC_KEY`
 3. **ตั้งค่า Omise Webhook** — `https://your-domain.vercel.app/api/webhooks/omise`
 4. **QA Omise payment** — ทดสอบ Test mode (test card: 4242 4242 4242 4242)
 5. **Switch Omise to Live mode** — เมื่อพร้อม launch จริง
+
+### 🔐 Security & PDPA Sprint 1 — Critical (ต้องทำก่อน Launch จริง)
+> แผนละเอียด: `docs/security/SECURITY_DEV_PLAN.md`
+
+6. **[TASK-S01] Omise Webhook Signature Verify** — `src/app/api/webhooks/omise/route.ts` | ~2h
+7. **[TASK-S02] Supabase RLS** — Enable RLS ทุก table ผ่าน Supabase Dashboard | ~3h
+8. **[TASK-S03] Privacy Notice + user_consents table** — schema + register form + API | ~4h
+9. **[TASK-S04] /privacy-policy + /terms pages** — static pages, public routes | ~2h
+10. **[TASK-S05] Admin IP Allowlisting** — `middleware.ts` + `ADMIN_IP_ALLOWLIST` env | ~3h
+
+### 🟡 Security Sprint 2 — High Priority (ภายใน 2 สัปดาห์)
+11. **[TASK-S06] OCR Improvement Consent** — toggle ใน Settings + gate OcrCorrection save | ~3h
+12. **[TASK-S07] Audit Log table + auditLog()** — schema + utility + hook ใน admin actions | ~4h
+13. **[TASK-S08] Email Verification** — token-based, ส่ง email หลัง register | ~5h
+14. **[TASK-S09] Security Headers + CSP** — `next.config.ts` headers | ~1h
 
 ---
 

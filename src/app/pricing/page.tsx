@@ -4,7 +4,8 @@ import dynamic from 'next/dynamic'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Check, X, Zap, QrCode, Loader2, Download, CreditCard, Smartphone, ArrowRight } from 'lucide-react'
-import { PLAN_LABELS, PLAN_PRICES, PLAN_COLORS } from '@/lib/features'
+import { PLAN_LABELS, PLAN_PRICES, PLAN_COLORS, CREDIT_PACKS } from '@/lib/features'
+import type { CreditPack } from '@/lib/features'
 import { generatePromptPayPayload, formatThaiPhone } from '@/lib/promptpay'
 import type { Plan } from '@/lib/features'
 import { cn } from '@/lib/utils/cn'
@@ -33,7 +34,7 @@ declare global {
 // ─── Feature comparison ───────────────────────────────────────────────────────
 const FEATURES: { label: string; free: string | boolean; pro: string | boolean; max: string | boolean }[] = [
   { label: 'บันทึกรายรับ-รายจ่าย', free: true,        pro: true,          max: true },
-  { label: 'OCR อ่านสลิป',         free: '20/เดือน',  pro: '100/เดือน',   max: 'ไม่จำกัด' },
+  { label: 'OCR อ่านสลิป',         free: '20/เดือน',  pro: '100/เดือน',   max: '500/เดือน' },
   { label: 'ดูประวัติย้อนหลัง',    free: '90 วัน',    pro: 'ไม่จำกัด',    max: 'ไม่จำกัด' },
   { label: 'หมวดหมู่',              free: '5 หมวด',    pro: 'ไม่จำกัด',    max: 'ไม่จำกัด' },
   { label: 'บัญชี',                 free: '2 บัญชี',   pro: 'ไม่จำกัด',    max: 'ไม่จำกัด' },
@@ -437,6 +438,92 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, phoneLoading, onCl
   )
 }
 
+// ─── Credit Modal ────────────────────────────────────────────────────────────
+function CreditModal({ pack, promptpayPhone, onClose, onSuccess }: {
+  pack:           CreditPack
+  promptpayPhone: string | null
+  onClose:        () => void
+  onSuccess:      () => void
+}) {
+  const [loading, setLoading] = useState(false)
+  const [sent,    setSent]    = useState(false)
+  const [error,   setError]   = useState<string | null>(null)
+  const canvasRef = useRef<HTMLDivElement>(null)
+
+  const payload = promptpayPhone
+    ? generatePromptPayPayload(promptpayPhone, pack.price)
+    : null
+
+  const submit = async () => {
+    setLoading(true); setError(null)
+    try {
+      const res = await fetch('/api/payments', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ credits: pack.credits, amount: pack.price, method: 'manual' }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'เกิดข้อผิดพลาด'); return }
+      setSent(true)
+      setTimeout(onSuccess, 2000)
+    } catch { setError('ไม่สามารถส่งคำขอได้') }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm rounded-3xl bg-white p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900">ซื้อเครดิต OCR</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="rounded-2xl bg-purple-50 border border-purple-100 p-4 text-center">
+          <p className="text-3xl font-bold text-purple-700">{pack.credits}</p>
+          <p className="text-sm text-purple-500">เครดิต OCR</p>
+          <p className="mt-2 text-xl font-semibold text-gray-900">฿{pack.price}</p>
+          <p className="text-xs text-gray-400">ไม่มีวันหมดอายุ · ใช้ได้ทุกเดือน</p>
+        </div>
+
+        {sent ? (
+          <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-center text-sm text-green-700">
+            ✓ แจ้งชำระเรียบร้อย — Admin จะเติมเครดิตภายใน 24 ชั่วโมง
+          </div>
+        ) : (
+          <>
+            {payload && promptpayPhone && (
+              <div className="flex flex-col items-center gap-3">
+                <div ref={canvasRef}>
+                  <QRCodeCanvas value={payload} size={180} level="M" />
+                </div>
+                <p className="text-xs text-gray-500 text-center">
+                  PromptPay: {formatThaiPhone(promptpayPhone)}
+                </p>
+              </div>
+            )}
+            <div className="text-xs text-gray-500 space-y-1">
+              <p>1. สแกน QR หรือโอนผ่าน PromptPay</p>
+              <p>2. ตรวจสอบจำนวน ฿{pack.price}</p>
+              <p>3. กด "แจ้งชำระเงินแล้ว"</p>
+              <p className="text-amber-600">⏳ Admin จะเติมเครดิตภายใน 24 ชั่วโมง</p>
+            </div>
+            {error && <p className="text-xs text-red-600 text-center">{error}</p>}
+            <button
+              onClick={submit}
+              disabled={loading}
+              className="w-full rounded-xl bg-purple-600 py-3 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-50"
+            >
+              {loading ? 'กำลังส่ง...' : 'แจ้งชำระเงินแล้ว'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Plan Card ────────────────────────────────────────────────────────────────
 interface PlanCardProps {
   plan: Plan
@@ -520,6 +607,7 @@ export default function PricingPage() {
   const { data: session } = useSession()
   const router = useRouter()
   const [selectedPlan,    setSelectedPlan]    = useState<'pro' | 'max' | null>(null)
+  const [selectedCredits, setSelectedCredits] = useState<CreditPack | null>(null)
   const [promptpayPhone,  setPromptpayPhone]  = useState<string | null>(null)
   const [omisePublicKey,  setOmisePublicKey]  = useState<string | null>(null)
   const [phoneLoading,    setPhoneLoading]    = useState(true)
@@ -602,6 +690,36 @@ export default function PricingPage() {
         </div>
       </div>
 
+      {/* OCR Credit Packs */}
+      <div>
+        <h2 className="text-sm font-semibold text-gray-700 mb-1">เติมเครดิต OCR เสริม</h2>
+        <p className="text-xs text-gray-400 mb-3">สำหรับผู้ใช้ Max ที่ต้องการสแกนสลิปเกิน 500 ครั้ง/เดือน · เครดิตไม่มีวันหมดอายุ</p>
+        <div className="grid grid-cols-3 gap-3">
+          {CREDIT_PACKS.map(pack => (
+            <button
+              key={pack.credits}
+              onClick={() => setSelectedCredits(pack)}
+              disabled={pendingPayment}
+              className={cn(
+                'relative rounded-2xl border-2 p-3 text-center transition-all hover:border-purple-400 hover:bg-purple-50 disabled:opacity-40',
+                'popular' in pack && pack.popular
+                  ? 'border-purple-400 bg-purple-50'
+                  : 'border-gray-100 bg-white'
+              )}
+            >
+              {'popular' in pack && pack.popular && (
+                <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-purple-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                  นิยม
+                </span>
+              )}
+              <p className="text-lg font-bold text-gray-900">{pack.credits}</p>
+              <p className="text-xs text-gray-400 mb-1">ครั้ง</p>
+              <p className="text-sm font-semibold text-purple-700">฿{pack.price}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* FAQ */}
       <div className="rounded-2xl bg-blue-50 p-4 text-sm text-blue-800 space-y-2">
         <p className="font-semibold">คำถามที่พบบ่อย</p>
@@ -627,6 +745,19 @@ export default function PricingPage() {
           onClose={() => setSelectedPlan(null)}
           onSuccess={() => {
             setSelectedPlan(null)
+            setPendingPayment(true)
+          }}
+        />
+      )}
+
+      {/* Credit Modal */}
+      {selectedCredits && !pendingPayment && (
+        <CreditModal
+          pack={selectedCredits}
+          promptpayPhone={promptpayPhone}
+          onClose={() => setSelectedCredits(null)}
+          onSuccess={() => {
+            setSelectedCredits(null)
             setPendingPayment(true)
           }}
         />

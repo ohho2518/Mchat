@@ -1,3 +1,7 @@
+> ✅ **COMPLETED** — ระบบ Referral & Affiliate implement ครบแล้วทั้งหมด (มิถุนายน 2569)  
+> Phase 1–5 เสร็จสมบูรณ์: DB models, APIs, /referral page, Admin panel, Omise hooks  
+> ดูรายละเอียดใน `CHANGELOG.md` และ `PROJECT_STATUS.md`
+
 # MChat Referral & Affiliate Program — Dev Spec
 
 > เอกสารสำหรับทีมพัฒนา  

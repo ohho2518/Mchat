@@ -33,9 +33,12 @@ model User {
   passwordHash  String?
   currency      String    @default("THB")
   monthStart    Int       @default(1)
-  plan          Plan      @default(free)
-  planExpiresAt DateTime?
-  createdAt     DateTime  @default(now())
+  plan               Plan      @default(free)
+  planExpiresAt      DateTime?
+  ocrCredits         Int       @default(0)
+  emailVerified      DateTime?
+  emailVerifyToken   String?   @unique
+  createdAt          DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   accounts          Account[]
@@ -53,6 +56,22 @@ model User {
   referralReceived  Referral?     @relation("ReferralReferred")
   commissionsEarned Commission[]  @relation("CommissionReferrer")
   payoutRequests    PayoutRequest[]
+  consents          UserConsent[]
+}
+
+// ─── User Consents (PDPA) ─────────────────────────────────
+model UserConsent {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "privacy_policy" | "terms" | "ocr_improvement"
+  version   String   // "2026-06" — เปลี่ยนเมื่ออัปเดต policy
+  agreedAt  DateTime @default(now())
+  ip        String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, type])
 }
 
 // ─── Accounts ─────────────────────────────────────────────
@@ -275,8 +294,9 @@ model PayoutRequest {
 model Payment {
   id            String        @id @default(uuid())
   userId        String
-  plan          Plan
+  plan          Plan?         // null = credit purchase
   months        Int           @default(1)
+  credits       Int?          // set สำหรับ credit purchase (100 / 300 / 500)
   amount        Decimal       @db.Decimal(10, 2)
   status        PaymentStatus @default(pending)
   method        String        // "promptpay" | "manual"
@@ -293,4 +313,21 @@ model SiteSetting {
   key       String   @id
   value     String   @db.Text
   updatedAt DateTime @updatedAt
+}
+
+// ─── Audit Log (S07) ─────────────────────────────────────
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorEmail String?
+  action     String   // "admin.payment.confirm" | "admin.user.plan_change" | etc.
+  targetType String?  // "payment" | "user" | "commission" | "payout"
+  targetId   String?
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
 }

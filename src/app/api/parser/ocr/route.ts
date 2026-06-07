@@ -95,10 +95,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'ส่งรูปเร็วเกินไป กรุณารอสักครู่' }, { status: 429 })
     }
 
-    // Monthly quota check
+    // Monthly quota check + credit fallback
     const plan      = (session.user.plan ?? 'free') as Plan
     const ocrLimit  = PLAN_LIMITS[plan].ocrPerMonth
     const month     = getThaiMonth()
+    let   useCredit = false
 
     if (ocrLimit !== null) {
       const quota = await prisma.usageQuota.upsert({
@@ -108,12 +109,20 @@ export async function POST(req: Request) {
         select: { ocrCount: true },
       })
       if (quota.ocrCount >= ocrLimit) {
-        return NextResponse.json({
-          error: `ใช้ OCR ครบ ${ocrLimit} ครั้งแล้วในเดือนนี้ (แผน ${plan.toUpperCase()})`,
-          code:  'OCR_QUOTA_EXCEEDED',
-          used:  quota.ocrCount,
-          limit: ocrLimit,
-        }, { status: 429 })
+        // Monthly quota exceeded — fall back to extra credits
+        const user = await prisma.user.findUnique({
+          where:  { id: session.user.id },
+          select: { ocrCredits: true },
+        })
+        if (!user?.ocrCredits || user.ocrCredits <= 0) {
+          return NextResponse.json({
+            error: `ใช้ OCR ครบ ${ocrLimit} ครั้งแล้วในเดือนนี้ กรุณาซื้อเครดิตเพิ่ม`,
+            code:  'OCR_QUOTA_EXCEEDED',
+            used:  quota.ocrCount,
+            limit: ocrLimit,
+          }, { status: 429 })
+        }
+        useCredit = true
       }
     }
 
@@ -206,8 +215,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'อ่านรูปไม่ได้ — ลองถ่ายรูปใหม่ให้ชัดขึ้น' }, { status: 422 })
     }
 
-    // Increment monthly quota after successful OCR
-    if (ocrLimit !== null) {
+    // Deduct quota or credit after successful OCR
+    if (useCredit) {
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data:  { ocrCredits: { decrement: 1 } },
+      })
+    } else if (ocrLimit !== null) {
       await prisma.usageQuota.update({
         where: { userId_month: { userId: session.user.id, month } },
         data:  { ocrCount: { increment: 1 } },

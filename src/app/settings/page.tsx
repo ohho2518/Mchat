@@ -1,11 +1,11 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSession, signOut } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { LogOut, Pencil, X, Check, Info, Download, Wallet, Tag, ChevronRight, HandCoins, BarChart2, ArrowLeftRight, Zap } from 'lucide-react'
+import { LogOut, Pencil, X, Check, Info, Download, Wallet, Tag, ChevronRight, HandCoins, BarChart2, ArrowLeftRight, Zap, MailCheck, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -30,6 +30,33 @@ const PasswordSchema = z.object({
 type ProfileForm = z.infer<typeof ProfileSchema>
 type PasswordForm = z.infer<typeof PasswordSchema>
 
+function EmailVerificationBanners({ emailVerified }: { emailVerified: boolean | undefined }) {
+  const searchParams = useSearchParams()
+  const verifiedParam = searchParams.get('verified')
+  return (
+    <>
+      {verifiedParam === '1' && (
+        <div className="flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
+          <MailCheck className="h-4 w-4 shrink-0" />
+          <span>ยืนยันอีเมลเรียบร้อยแล้ว</span>
+        </div>
+      )}
+      {verifiedParam === 'error' && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          <X className="h-4 w-4 shrink-0" />
+          <span>ลิงก์ยืนยันอีเมลไม่ถูกต้องหรือหมดอายุแล้ว</span>
+        </div>
+      )}
+      {emailVerified === false && verifiedParam !== '1' && (
+        <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
+          <MailCheck className="h-4 w-4 shrink-0 text-amber-500" />
+          <span>อีเมลของคุณยังไม่ได้รับการยืนยัน กรุณาตรวจสอบกล่องจดหมาย</span>
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function SettingsPage() {
   const { data: session, status, update } = useSession()
   const router = useRouter()
@@ -40,8 +67,10 @@ export default function SettingsPage() {
   const [installPrompt, setInstallPrompt] = useState<any>(null)
   const [isInstalled, setIsInstalled] = useState(false)
   const [quota, setQuota] = useState<{
-    plan: Plan; ocrCount: number; ocrLimit: number | null; month: string
+    plan: Plan; ocrCount: number; ocrLimit: number | null; month: string; ocrCredits: number; emailVerified: boolean
   } | null>(null)
+  const [ocrConsent, setOcrConsent] = useState<boolean | null>(null)
+  const [consentLoading, setConsentLoading] = useState(false)
 
   useEffect(() => {
     const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e) }
@@ -56,7 +85,25 @@ export default function SettingsPage() {
       .then(r => r.json())
       .then(data => setQuota(data))
       .catch(() => {})
+    fetch('/api/user/consent?type=ocr_improvement')
+      .then(r => r.json())
+      .then((data: { type: string }[]) => setOcrConsent(data.length > 0))
+      .catch(() => {})
   }, [])
+
+  const toggleOcrConsent = async (agreed: boolean) => {
+    setConsentLoading(true)
+    try {
+      await fetch('/api/user/consent', {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ type: 'ocr_improvement', agreed }),
+      })
+      setOcrConsent(agreed)
+    } finally {
+      setConsentLoading(false)
+    }
+  }
 
   const handleInstall = async () => {
     if (!installPrompt) return
@@ -134,6 +181,11 @@ export default function SettingsPage() {
 
   return (
     <div className="p-4 space-y-4 pb-6">
+      {/* Email verification banners */}
+      <Suspense fallback={null}>
+        <EmailVerificationBanners emailVerified={quota?.emailVerified} />
+      </Suspense>
+
       {/* Avatar + info */}
       <Card>
         <div className="flex items-center gap-4">
@@ -184,6 +236,14 @@ export default function SettingsPage() {
                 )}
               </div>
 
+              {/* Extra credits balance */}
+              {quota.ocrCredits > 0 && (
+                <div className="flex items-center justify-between rounded-lg bg-purple-50 border border-purple-100 px-3 py-2">
+                  <span className="text-xs text-purple-700">เครดิต OCR เสริม</span>
+                  <span className="text-sm font-semibold text-purple-700">{quota.ocrCredits} ครั้ง</span>
+                </div>
+              )}
+
               {/* Upgrade nudge for free/pro plan */}
               {quota.plan !== 'max' && (
                 <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 text-xs text-blue-700 space-y-2">
@@ -201,7 +261,7 @@ export default function SettingsPage() {
                     <>
                       <p className="font-medium">อัปเกรดเป็น Max</p>
                       <ul className="space-y-0.5 text-blue-600">
-                        <li>• OCR ไม่จำกัด</li>
+                        <li>• OCR 500 ครั้ง/เดือน + ซื้อเครดิตเพิ่มได้</li>
                         <li>• รองรับหลายผู้ใช้ (5 คน)</li>
                       </ul>
                       <p className="font-semibold">฿{PLAN_PRICES.max.monthly}/เดือน</p>
@@ -347,6 +407,42 @@ export default function SettingsPage() {
           </Link>
         </Card>
       )}
+
+      {/* Privacy & Consent */}
+      <Card>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">ความเป็นส่วนตัว</p>
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
+              <div>
+                <p className="text-sm font-medium text-gray-700">ช่วยพัฒนาระบบ OCR</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  ยินยอมให้แชร์ข้อมูลการแก้ไขสลิปเพื่อปรับปรุงความแม่นยำ
+                  (<Link href="/privacy-policy" className="underline">นโยบายความเป็นส่วนตัว</Link>)
+                </p>
+              </div>
+            </div>
+            <button
+              disabled={consentLoading || ocrConsent === null}
+              onClick={() => toggleOcrConsent(!ocrConsent)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors
+                ${ocrConsent ? 'bg-blue-600' : 'bg-gray-300'}
+                disabled:opacity-50`}
+              role="switch"
+              aria-checked={ocrConsent ?? false}
+            >
+              <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform
+                ${ocrConsent ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+          <div className="pt-1 flex flex-wrap gap-2 text-xs text-gray-400">
+            <Link href="/privacy-policy" className="hover:text-gray-600 underline">นโยบายความเป็นส่วนตัว</Link>
+            <span>·</span>
+            <Link href="/terms" className="hover:text-gray-600 underline">เงื่อนไขการใช้งาน</Link>
+          </div>
+        </div>
+      </Card>
 
       {/* App info */}
       <Card>

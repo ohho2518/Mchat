@@ -23,9 +23,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
     }
 
-    // บันทึกเฉพาะเมื่อ corrected ≠ original
     if (parsed.data.originalText === parsed.data.correctedText) {
       return NextResponse.json({ ok: true, saved: false })
+    }
+
+    // S06: Only save if user has ocr_improvement consent
+    const consent = await prisma.userConsent.findFirst({
+      where: { userId: session.user.id, type: 'ocr_improvement' },
+    })
+    if (!consent) {
+      return NextResponse.json({ ok: true, saved: false, reason: 'no_consent' })
     }
 
     await prisma.ocrCorrection.create({
