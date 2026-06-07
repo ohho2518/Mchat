@@ -14,14 +14,14 @@ export function Header({ title, userName }: HeaderProps) {
       <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto">
         {userName ? (
           <div className="flex items-center gap-2">
-            <Image src="/logo.png" alt="MChat" width={80} height={26} />
+            <Image src="/logo.png" alt="MChat" width={80} height={27} />
             <div>
               <p className="text-xs text-gray-400">สวัสดี</p>
               <p className="text-sm font-semibold text-gray-900 leading-tight">{userName}</p>
             </div>
           </div>
         ) : (
-          <Image src="/logo.png" alt="MChat" width={80} height={26} />
+          <Image src="/logo.png" alt="MChat" width={80} height={27} />
         )}
         {initial && (
           <div className="flex items-center gap-2">

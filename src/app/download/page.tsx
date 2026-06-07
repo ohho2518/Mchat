@@ -56,7 +56,7 @@ export default function DownloadPage() {
 
         {/* Hero */}
         <div className="text-center space-y-3">
-          <Image src="/logo.png" alt="MChat" width={260} height={80} className="mx-auto" priority />
+          <Image src="/logo.png" alt="MChat" width={260} height={86} className="mx-auto" priority />
           <p className="text-gray-500 leading-relaxed">
             แอปบันทึกรายรับรายจ่าย<br />ด้วยแชทภาษาไทย ง่ายที่สุดในไทย
           </p>

@@ -74,7 +74,7 @@ function LoginForm() {
       <div className="w-full max-w-sm space-y-6">
         {/* Logo */}
         <div className="text-center">
-          <Image src="/logo.png" alt="MChat" width={220} height={70} className="mx-auto" priority />
+          <Image src="/logo.png" alt="MChat" width={220} height={73} className="mx-auto" priority />
         </div>
 
         {/* Mode toggle */}
