@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface HeaderProps {
   title: string
@@ -12,12 +13,15 @@ export function Header({ title, userName }: HeaderProps) {
     <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
       <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto">
         {userName ? (
-          <div>
-            <p className="text-xs text-gray-400">สวัสดี</p>
-            <h1 className="text-base font-semibold text-gray-900 leading-tight">{userName}</h1>
+          <div className="flex items-center gap-2">
+            <Image src="/logo.png" alt="MChat" width={80} height={26} />
+            <div>
+              <p className="text-xs text-gray-400">สวัสดี</p>
+              <p className="text-sm font-semibold text-gray-900 leading-tight">{userName}</p>
+            </div>
           </div>
         ) : (
-          <h1 className="text-lg font-semibold text-gray-900">{title}</h1>
+          <Image src="/logo.png" alt="MChat" width={80} height={26} />
         )}
         {initial && (
           <div className="flex items-center gap-2">

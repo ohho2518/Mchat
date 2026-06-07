@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 
@@ -73,11 +74,7 @@ function LoginForm() {
       <div className="w-full max-w-sm space-y-6">
         {/* Logo */}
         <div className="text-center">
-          <div className="mb-2 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-2xl text-white shadow-lg">
-            💬
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">MChat</h1>
-          <p className="mt-1 text-sm text-gray-500">บันทึกรายรับรายจ่ายด้วยแชท</p>
+          <Image src="/logo.png" alt="MChat" width={220} height={70} className="mx-auto" priority />
         </div>
 
         {/* Mode toggle */}

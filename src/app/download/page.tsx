@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { MessageSquare, BarChart2, Mic, Camera, Download, Star, ChevronDown, ChevronUp } from 'lucide-react'
 
 const FEATURES = [
@@ -55,10 +56,7 @@ export default function DownloadPage() {
 
         {/* Hero */}
         <div className="text-center space-y-3">
-          <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-blue-600 text-4xl shadow-lg">
-            💬
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">MChat</h1>
+          <Image src="/logo.png" alt="MChat" width={260} height={80} className="mx-auto" priority />
           <p className="text-gray-500 leading-relaxed">
             แอปบันทึกรายรับรายจ่าย<br />ด้วยแชทภาษาไทย ง่ายที่สุดในไทย
           </p>
