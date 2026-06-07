@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db/prisma'
 import { hashPassword } from '@/lib/utils/password'
 import { generateReferralCode } from '@/lib/referral'
 import { sendEmail, buildVerifyEmailHtml } from '@/lib/email'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 const RegisterSchema = z.object({
   name:    z.string().min(1).max(50),
@@ -11,20 +12,6 @@ const RegisterSchema = z.object({
   password: z.string().min(6).max(100),
   refCode: z.string().max(20).optional(),
 })
-
-// 5 registrations per minute per IP (per serverless instance)
-const registerRateMap = new Map<string, { count: number; resetAt: number }>()
-function checkRegisterRate(ip: string): boolean {
-  const now = Date.now()
-  const entry = registerRateMap.get(ip)
-  if (!entry || entry.resetAt < now) {
-    registerRateMap.set(ip, { count: 1, resetAt: now + 60_000 })
-    return true
-  }
-  if (entry.count >= 5) return false
-  entry.count++
-  return true
-}
 
 async function generateUniqueCode(name: string): Promise<string> {
   for (let i = 0; i < 10; i++) {
@@ -39,7 +26,8 @@ async function generateUniqueCode(name: string): Promise<string> {
 export async function POST(req: Request) {
   try {
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-    if (!checkRegisterRate(clientIp)) {
+    const allowed  = await checkRateLimit(`register:${clientIp}`, 5, 60_000)
+    if (!allowed) {
       return NextResponse.json({ error: 'ลองใหม่ในอีกสักครู่' }, { status: 429 })
     }
 

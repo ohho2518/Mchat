@@ -12,8 +12,8 @@ const PUBLIC_PREFIXES = [
   '/api/auth/',
   '/api/ref/',
   '/api/referral/terms',
+  '/api/cron/',   // Vercel Cron — secured by CRON_SECRET header inside each handler
 ]
-// Note: /api/auth/ already covers /api/auth/verify-email
 
 // S05: Admin IP allowlisting — set ADMIN_IP_ALLOWLIST env var (comma-separated)
 function checkAdminAccess(req: NextRequest): boolean {

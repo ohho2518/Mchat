@@ -4,23 +4,10 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db/prisma'
 import { PLAN_LIMITS, getThaiMonth } from '@/lib/features'
 import type { Plan } from '@/lib/features'
+import { checkRateLimit } from '@/lib/ratelimit'
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 const MAX_B64_LEN  = 20 * 1024 * 1024
-
-// 10 OCR calls per 60 s per user (per serverless instance)
-const ocrRateMap = new Map<string, { count: number; resetAt: number }>()
-function checkOcrRate(userId: string): boolean {
-  const now = Date.now()
-  const entry = ocrRateMap.get(userId)
-  if (!entry || entry.resetAt < now) {
-    ocrRateMap.set(userId, { count: 1, resetAt: now + 60_000 })
-    return true
-  }
-  if (entry.count >= 10) return false
-  entry.count++
-  return true
-}
 
 const BASE_PROMPT = `คุณคือผู้ช่วยอ่านสลิปธนาคาร บิล และใบเสร็จภาษาไทย
 
@@ -91,7 +78,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!checkOcrRate(session.user.id)) {
+    const ocrAllowed = await checkRateLimit(`ocr:${session.user.id}`, 10, 60_000)
+    if (!ocrAllowed) {
       return NextResponse.json({ error: 'ส่งรูปเร็วเกินไป กรุณารอสักครู่' }, { status: 429 })
     }
 

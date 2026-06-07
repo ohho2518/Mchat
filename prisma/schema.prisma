@@ -266,6 +266,8 @@ model Commission {
   amount         Decimal   @db.Decimal(10, 2)
   status         String    @default("pending") // pending | approved | paid | canceled
   holdUntil      DateTime
+  riskFlag       Boolean   @default(false)
+  riskReason     String?
   createdAt      DateTime  @default(now())
   approvedAt     DateTime?
   paidAt         DateTime?
@@ -313,6 +315,15 @@ model SiteSetting {
   key       String   @id
   value     String   @db.Text
   updatedAt DateTime @updatedAt
+}
+
+// ─── Rate Limit Store (S11) ───────────────────────────────
+model RateLimit {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+
+  @@index([resetAt])
 }
 
 // ─── Audit Log (S07) ─────────────────────────────────────
