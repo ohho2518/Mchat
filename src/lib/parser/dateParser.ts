@@ -32,8 +32,14 @@ export function extractDate(text: string): string | null {
   const dmy = text.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/)
   if (dmy) {
     let year = parseInt(dmy[3])
-    if (year > 2400) year -= 543          // Buddhist era → CE
-    if (year < 100)  year += 2000         // 2-digit year
+    if (year > 2400) year -= 543          // Buddhist era full year (e.g. 2567 → 2024)
+    else if (year < 100) {
+      // 2-digit year: Thai receipts use BE short form e.g. "67" = BE 2567 = CE 2024
+      const candidateCE    = year + 2000
+      const candidateThai  = (2500 + year) - 543  // BE short → CE
+      // If CE interpretation is > 1 year in future, it's likely a Thai BE short year
+      year = candidateCE > today.getFullYear() + 1 ? candidateThai : candidateCE
+    }
     const month = parseInt(dmy[2])
     const day   = parseInt(dmy[1])
     const d = new Date(year, month - 1, day)

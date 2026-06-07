@@ -1,12 +1,14 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { ChatInput, ChatMessage, DateContextBar, ParsedTransactionCard } from '@/components/chat'
 import { TransactionForm } from '@/components/transactions'
 import { Spinner } from '@/components/ui'
 import type { ParsedTransaction, Transaction } from '@/types/transaction'
 import { format } from 'date-fns'
 import { trackEvent } from '@/lib/analytics/track'
+import { PLAN_LIMITS } from '@/lib/features'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type MsgUser   = { id: string; role: 'user';   text: string }
@@ -27,6 +29,7 @@ const todayStr = () => format(new Date(), 'yyyy-MM-dd')
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function ChatPage() {
   const router = useRouter()
+  const { data: session } = useSession()
   const [messages, setMessages] = useState<MessageItem[]>([
     {
       id: uid(),
@@ -120,6 +123,23 @@ export default function ChatPage() {
         type: parsed.type, amount: parsed.amount,
         confidence: parsed.confidence, category: parsed.categoryName,
       })
+
+      // Warn if date is outside plan's history window (Free = 90 days)
+      const plan = session?.user?.plan ?? 'free'
+      const historyDays = PLAN_LIMITS[plan].historyDays
+      if (historyDays !== null) {
+        const txDate = new Date(transactionDate)
+        const cutoff = new Date()
+        cutoff.setDate(cutoff.getDate() - historyDays)
+        if (txDate < cutoff) {
+          setMessages((prev) => [...prev, {
+            id: uid(), role: 'system',
+            text: `⚠️ รายการถูกบันทึกแล้ว แต่วันที่ "${transactionDate}" เกิน ${historyDays} วัน แพลน Free แสดงประวัติ ${historyDays} วันล่าสุดเท่านั้น — อัปเกรดเป็น Pro เพื่อดูรายการนี้`,
+            variant: 'error',
+          }])
+        }
+      }
+
       // Invalidate Next.js router cache so Transactions/Dashboard pages re-fetch on next visit
       router.refresh()
     } catch {
