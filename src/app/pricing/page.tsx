@@ -494,13 +494,26 @@ function CreditModal({ pack, promptpayPhone, onClose, onSuccess }: {
         ) : (
           <>
             {payload && promptpayPhone && (
-              <div className="flex flex-col items-center gap-3">
-                <div ref={canvasRef}>
+              <div className="flex flex-col items-center gap-2">
+                <div ref={canvasRef} className="p-3 rounded-2xl border border-gray-100 bg-white shadow-sm">
                   <QRCodeCanvas value={payload} size={180} level="M" />
                 </div>
                 <p className="text-xs text-gray-500 text-center">
                   PromptPay: {formatThaiPhone(promptpayPhone)}
                 </p>
+                <button
+                  onClick={() => {
+                    const canvas = canvasRef.current?.querySelector('canvas')
+                    if (!canvas) return
+                    const a = document.createElement('a')
+                    a.href = canvas.toDataURL('image/png')
+                    a.download = `promptpay-ocr-${pack.credits}credits-${pack.price}thb.png`
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a)
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+                >
+                  <Download className="h-3.5 w-3.5" /> บันทึก QR
+                </button>
               </div>
             )}
             <div className="text-xs text-gray-500 space-y-1">
