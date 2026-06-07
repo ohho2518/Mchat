@@ -49,6 +49,17 @@ export async function PATCH(
         }
       }
 
+      // Upsert MerchantProfile using holderName (the stable identity for this merchant)
+      const correction = await prisma.ocrCorrection.findUnique({ where: { id }, select: { holderName: true } })
+      const merchantName = correction?.holderName?.trim() || keyword?.trim()
+      if (merchantName && reviewedType) {
+        await prisma.merchantProfile.upsert({
+          where:  { name: merchantName },
+          create: { name: merchantName, type: reviewedType, categoryId: categoryId ?? null },
+          update: { type: reviewedType, categoryId: categoryId ?? null, sourceCount: { increment: 1 } },
+        })
+      }
+
       const updated = await prisma.ocrCorrection.update({
         where: { id },
         data: {

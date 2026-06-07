@@ -70,11 +70,32 @@ const BASE_PROMPT = `คุณคือผู้ช่วยอ่านสล�
 
 ตอบ JSON เท่านั้น ไม่ต้องอธิบายเพิ่ม`
 
-function buildPrompt(accountNames: string[]): string {
+const TYPE_PREFIX: Record<string, string> = {
+  expense:  'ชำระ/จ่าย',
+  income:   'รับโอน',
+  transfer: 'โอนเงิน',
+  debt:     'หนี้',
+}
+
+function buildPrompt(
+  accountNames: string[],
+  merchants: Array<{ name: string; type: string; category: { name: string } | null }>
+): string {
   const names = accountNames.length > 0
     ? accountNames.map(n => `"${n}"`).join(', ')
     : '(ไม่มีข้อมูลบัญชี)'
-  return BASE_PROMPT.replace('{ACCOUNT_NAMES}', names)
+
+  let merchantSection = ''
+  if (merchants.length > 0) {
+    const lines = merchants.map(m => {
+      const prefix = TYPE_PREFIX[m.type] ?? m.type
+      const cat    = m.category?.name ? `, ${m.category.name}` : ''
+      return `- "${m.name}" → ${prefix} (${m.type}${cat})`
+    }).join('\n')
+    merchantSection = `\n\n─── ร้านค้า/บุคคลที่รู้จักแล้ว (ใช้ prefix นี้เสมอถ้าเห็นชื่อนี้) ───\n${lines}`
+  }
+
+  return BASE_PROMPT.replace('{ACCOUNT_NAMES}', names) + merchantSection
 }
 
 export async function POST(req: Request) {
@@ -141,18 +162,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'ประเภทไฟล์ไม่รองรับ' }, { status: 400 })
     }
 
-    // Fetch user's account names for sender/receiver matching (fail gracefully)
+    // Fetch accounts + known merchants in parallel (fail gracefully)
     let accountNames: string[] = []
+    let merchants: Array<{ name: string; type: string; category: { name: string } | null }> = []
     try {
-      const accounts = await prisma.account.findMany({
-        where: { userId: session.user.id, isActive: true },
-        select: { name: true },
-      })
+      const [accounts, merchantRows] = await Promise.all([
+        prisma.account.findMany({
+          where:  { userId: session.user.id, isActive: true },
+          select: { name: true },
+        }),
+        prisma.merchantProfile.findMany({
+          take:     50,
+          orderBy:  { sourceCount: 'desc' },
+          select:   { name: true, type: true, category: { select: { name: true } } },
+        }),
+      ])
       accountNames = accounts.map(a => a.name)
+      merchants    = merchantRows
     } catch (dbErr) {
-      console.error('[OCR] DB query failed, continuing without account names:', dbErr)
+      console.error('[OCR] DB query failed, continuing without account/merchant data:', dbErr)
     }
-    const prompt = buildPrompt(accountNames)
+    const prompt = buildPrompt(accountNames, merchants)
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       signal: AbortSignal.timeout(20_000),

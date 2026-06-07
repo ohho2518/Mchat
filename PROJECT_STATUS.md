@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-2026-06-07 — Security Sprint 2 (S06–S09) + OCR Credit System
+2026-06-07 — MerchantProfile (OCR Knowledge Layer) + Train OCR dedicated page
 
 ---
 
@@ -144,6 +144,20 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
   - Admin page: User management section — list users + plan editor per row
   - `GET /api/user/quota` — ดึงสถานะ OCR quota ของ user
   - `src/components/ui/UpgradePrompt.tsx` — reusable upgrade prompt (compact + card)
+- [x] **Train OCR System (2026-06-07)**:
+  - OCR corrections flow: user consent → OcrCorrection record → admin review → apply keyword
+  - `/admin/train-ocr` — dedicated admin page (3 tabs: ทดสอบ OCR, Review Corrections, Merchant Library)
+  - `POST /api/admin/ocr-corrections` — admin bypass-consent สร้าง correction โดยตรง
+  - `MerchantProfile` model — เก็บ name/type/categoryId/sourceCount สำหรับ OCR knowledge
+  - PATCH apply → upsert MerchantProfile อัตโนมัติเมื่อ admin apply correction
+  - OCR route — inject top-50 merchants ลง prompt (GPT ใช้ known merchant prefix ถูกต้องทันที)
+  - `GET /api/admin/merchant-profiles` — list merchants (search + paginate)
+  - `DELETE /api/admin/merchant-profiles/[id]` — ลบ merchant จาก library
+  - Admin main page — Train OCR เปลี่ยนเป็น link card พร้อม pending badge
+- [x] **OCR Bug Fixes (2026-06-07)**:
+  - เป๋าตัง receipt: เพิ่ม Rule 0 ใน prompt — ใช้ "จำนวนเงินที่ชำระ" เท่านั้น ไม่ใช้ยอดก่อนหักส่วนลด
+  - Type detection: store/business check (rule 1) > receiver=owner (rule 2) ป้องกัน expense ถูก classify เป็น transfer
+  - dateParser: แก้ 2-digit Thai BE year parsing (short year 69 = BE 2569 = CE 2026)
 - [x] **Security & Bug Fix Pass (15 issues)** — Critical/High/Medium ทั้งหมดแก้แล้ว:
   - Bug: date range filter ใน transactions API (startDate+endDate spread overwrite กัน)
   - Security: OCR rate limiting (10 req/min/user), mimeType allowlist, base64 size limit (20 MB), fetch timeout (20s)

@@ -402,14 +402,21 @@ export default function SettingsPage() {
       </Card>
 
       {/* Admin — เฉพาะ admin email */}
-      {session.user.email === 'vndn2518@gmail.com' && (
+      {session.user.email === (process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? 'vndn2518@gmail.com') && (
         <Card>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Admin</p>
-          <Link href="/admin" className="flex items-center gap-3 py-2.5 text-sm text-gray-700 hover:text-blue-600 transition-colors">
-            <BarChart2 className="h-4 w-4 text-gray-400" />
-            <span className="flex-1">Analytics Dashboard</span>
-            <ChevronRight className="h-4 w-4 text-gray-300" />
-          </Link>
+          <div className="divide-y divide-gray-100">
+            <Link href="/admin" className="flex items-center gap-3 py-2.5 text-sm text-gray-700 hover:text-blue-600 transition-colors">
+              <BarChart2 className="h-4 w-4 text-gray-400" />
+              <span className="flex-1">Analytics Dashboard</span>
+              <ChevronRight className="h-4 w-4 text-gray-300" />
+            </Link>
+            <Link href="/admin/train-ocr" className="flex items-center gap-3 py-2.5 text-sm text-gray-700 hover:text-blue-600 transition-colors">
+              <ShieldCheck className="h-4 w-4 text-gray-400" />
+              <span className="flex-1">Train OCR</span>
+              <ChevronRight className="h-4 w-4 text-gray-300" />
+            </Link>
+          </div>
         </Card>
       )}
 
@@ -422,8 +429,10 @@ export default function SettingsPage() {
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
               <div>
                 <p className="text-sm font-medium text-gray-700">ช่วยพัฒนาระบบ OCR</p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  ยินยอมให้แชร์ข้อมูลการแก้ไขสลิปเพื่อปรับปรุงความแม่นยำ
+                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                  เมื่อเปิด ระบบจะเก็บข้อมูลการแก้ไข OCR ของคุณ
+                  <span className="font-medium text-gray-600">เพื่อพัฒนาความแม่นยำการอ่านสลิปเท่านั้น</span>
+                  — ข้อมูลจะไม่ถูกนำไปใช้เพื่อวัตถุประสงค์อื่น ไม่มีการแชร์กับบุคคลที่สาม
                   (<Link href="/privacy-policy" className="underline">นโยบายความเป็นส่วนตัว</Link>)
                 </p>
               </div>
