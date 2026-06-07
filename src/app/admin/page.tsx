@@ -149,6 +149,7 @@ function CorrectionCard({
 function TrainOcrSection() {
   const [open,        setOpen]        = useState(false)
   const [loading,     setLoading]     = useState(false)
+  const [loadError,   setLoadError]   = useState<string | null>(null)
   const [status,      setStatus]      = useState('pending')
   const [corrections, setCorrections] = useState<OcrCorrectionRow[]>([])
   const [categories,  setCategories]  = useState<GlobalCategory[]>([])
@@ -157,17 +158,32 @@ function TrainOcrSection() {
   const [totalPages,  setTotalPages]  = useState(1)
   const [actioning,   setActioning]   = useState<string | null>(null)
 
+  // Auto-fetch counts on mount so badge shows before clicking เปิด
+  useEffect(() => {
+    fetch('/api/admin/ocr-corrections?status=pending&page=1')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.counts) setCounts(d.counts) })
+      .catch(() => {})
+  }, [])
+
   const load = async (s: string, p: number) => {
     setLoading(true)
+    setLoadError(null)
     try {
       const res = await fetch(`/api/admin/ocr-corrections?status=${s}&page=${p}`)
-      if (!res.ok) return
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        setLoadError(`โหลดไม่สำเร็จ (HTTP ${res.status}): ${(err as any).error ?? 'Unknown error'}`)
+        return
+      }
       const data = await res.json()
       setCorrections(data.data)
       setCategories(data.globalCategories)
       setCounts(data.counts)
       setPage(data.pagination.page)
       setTotalPages(data.pagination.totalPages)
+    } catch (e) {
+      setLoadError(`เกิดข้อผิดพลาด: ${e instanceof Error ? e.message : 'Unknown'}`)
     } finally {
       setLoading(false)
     }
@@ -253,12 +269,27 @@ function TrainOcrSection() {
             ))}
           </div>
 
+          {/* Error */}
+          {loadError && (
+            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+              <p className="text-sm text-red-700">{loadError}</p>
+              <button onClick={() => load(status, page)} className="mt-1.5 text-xs text-red-600 hover:underline">
+                ลองใหม่
+              </button>
+            </div>
+          )}
+
           {/* List */}
           {loading ? (
             <p className="text-sm text-gray-400 text-center py-6">กำลังโหลด...</p>
-          ) : corrections.length === 0 ? (
-            <div className="rounded-xl bg-gray-50 border border-gray-100 p-6 text-center">
-              <p className="text-sm text-gray-400">ไม่มีรายการ {status === 'pending' ? 'รอ review' : status}</p>
+          ) : !loadError && corrections.length === 0 ? (
+            <div className="rounded-xl bg-gray-50 border border-gray-100 p-6 text-center space-y-2">
+              <p className="text-sm text-gray-500">ไม่มีรายการ {status === 'pending' ? 'รอ review' : status}</p>
+              {status === 'pending' && (
+                <p className="text-xs text-gray-400">
+                  ข้อมูลจะปรากฏเมื่อ: ผู้ใช้เปิด Settings → ยินยอม OCR Improvement → ใช้ OCR แล้วแก้ไขข้อความ
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
