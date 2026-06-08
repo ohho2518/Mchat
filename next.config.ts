@@ -1,5 +1,8 @@
 import type { NextConfig } from 'next'
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pkg = require('./package.json') as { version: string }
+
 const isDev = process.env.NODE_ENV !== 'production'
 
 const csp = [
@@ -33,6 +36,10 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION: pkg.version,
+    NEXT_PUBLIC_BUILD_TIME:  new Date().toISOString(),
+  },
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }]
   },
