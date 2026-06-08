@@ -201,7 +201,7 @@ export async function POST(req: Request) {
               { type: 'text', text: prompt },
               {
                 type: 'image_url',
-                image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: 'low' },
+                image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: 'auto' },
               },
             ],
           },

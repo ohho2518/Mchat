@@ -1,9 +1,18 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Camera, ImageIcon, Loader2, FlaskConical, ClipboardList, BookOpen, Trash2 } from 'lucide-react'
+import { ArrowLeft, Camera, ImageIcon, Loader2, FlaskConical, ClipboardList, BookOpen, Trash2, RefreshCw } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+interface ParseResult {
+  type: string
+  amount: number | null
+  transactionDate: string | null
+  categoryName: string | null
+  description: string
+  paymentMethod: string
+  confidence: number
+}
 interface GlobalCategory { id: string; name: string; type: string; keywords: { id: string; keyword: string }[] }
 interface OcrCorrectionRow {
   id: string; originalText: string; correctedText: string
@@ -164,6 +173,8 @@ export default function AdminTrainOcrPage() {
   const [testType,      setTestType]      = useState('expense')
   const [testCatId,     setTestCatId]     = useState('')
   const [testKeyword,   setTestKeyword]   = useState('')
+  const [parseResult,   setParseResult]   = useState<ParseResult | null>(null)
+  const [parseLoading,  setParseLoading]  = useState(false)
 
   // ── Load initial data ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -219,9 +230,27 @@ export default function AdminTrainOcrPage() {
   }
 
   // ── OCR upload ───────────────────────────────────────────────────────────────
+  const runParser = async (text: string) => {
+    if (!text.trim()) return
+    setParseLoading(true)
+    try {
+      const res = await fetch('/api/parser/parse', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ text }),
+      })
+      if (res.ok) setParseResult(await res.json())
+      else        setParseResult(null)
+    } catch {
+      setParseResult(null)
+    } finally {
+      setParseLoading(false)
+    }
+  }
+
   const handleFile = async (file: File) => {
     if (file.size > 20 * 1024 * 1024) { setOcrError('ไฟล์ใหญ่เกิน 20MB'); return }
-    setOcrLoading(true); setOcrError(null); setOcrOriginal(''); setOcrCorrected(''); setOcrHolder(''); setSaveSuccess(false)
+    setOcrLoading(true); setOcrError(null); setOcrOriginal(''); setOcrCorrected(''); setOcrHolder(''); setSaveSuccess(false); setParseResult(null)
     try {
       const { base64, mimeType } = await resizeImage(file)
       const res  = await fetch('/api/parser/ocr', {
@@ -231,10 +260,12 @@ export default function AdminTrainOcrPage() {
       })
       const data = await res.json()
       if (!res.ok) { setOcrError(data.error ?? 'OCR ล้มเหลว'); return }
-      setOcrOriginal(data.text ?? '')
-      setOcrCorrected(data.text ?? '')
+      const ocrText = data.text ?? ''
+      setOcrOriginal(ocrText)
+      setOcrCorrected(ocrText)
       setOcrHolder(data.holderName ?? '')
       setTestKeyword(data.holderName ?? '')
+      await runParser(ocrText)
     } catch {
       setOcrError('เกิดข้อผิดพลาด กรุณาลองใหม่')
     } finally {
@@ -392,6 +423,66 @@ export default function AdminTrainOcrPage() {
                   <div className="rounded-xl bg-red-50 border border-red-100 px-3 py-3 text-sm font-mono text-red-800 break-all">
                     {ocrOriginal}
                   </div>
+                </div>
+
+                {/* Parser result */}
+                <div className={`rounded-xl border p-3 space-y-2 ${
+                  parseLoading ? 'bg-gray-50 border-gray-200' :
+                  parseResult && parseResult.confidence >= 0.6 ? 'bg-green-50 border-green-200' :
+                  parseResult ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-600">ผลจาก Parser (rule-based)</p>
+                    {!parseLoading && ocrOriginal && (
+                      <button
+                        onClick={() => runParser(ocrCorrected || ocrOriginal)}
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        <RefreshCw className="h-3 w-3" /> Re-run
+                      </button>
+                    )}
+                  </div>
+                  {parseLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Loader2 className="h-3 w-3 animate-spin" /> กำลัง parse...
+                    </div>
+                  ) : parseResult ? (
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <div>
+                        <span className="text-gray-400">ประเภท</span>
+                        <span className={`ml-2 font-medium px-1.5 py-0.5 rounded text-xs ${TYPE_COLOR[parseResult.type] ?? 'text-gray-500'}`}>
+                          {TYPE_LABEL[parseResult.type] ?? parseResult.type}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">จำนวน</span>
+                        <span className={`ml-2 font-medium ${parseResult.amount ? 'text-gray-800' : 'text-red-500'}`}>
+                          {parseResult.amount != null ? `${parseResult.amount.toLocaleString()} บาท` : '— ไม่พบ'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">วันที่</span>
+                        <span className={`ml-2 font-medium ${parseResult.transactionDate ? 'text-gray-800' : 'text-gray-400'}`}>
+                          {parseResult.transactionDate ?? '—'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">หมวดหมู่</span>
+                        <span className={`ml-2 font-medium ${parseResult.categoryName ? 'text-gray-800' : 'text-amber-600'}`}>
+                          {parseResult.categoryName ?? '— ไม่พบ'}
+                        </span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-gray-400">Confidence</span>
+                        <span className={`ml-2 font-semibold ${parseResult.confidence >= 0.6 ? 'text-green-700' : 'text-red-600'}`}>
+                          {Math.round(parseResult.confidence * 100)}%
+                          {parseResult.confidence < 0.6 && ' ⚠ ต่ำกว่า 60%'}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400">—</p>
+                  )}
                 </div>
 
                 <div>
