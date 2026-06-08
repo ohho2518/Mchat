@@ -10,12 +10,13 @@ const MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค
 
 function formatBuildTime(iso: string | undefined): string {
   if (!iso) return ''
-  const d = new Date(iso)
-  const day   = d.getUTCDate()
-  const month = MONTHS_SHORT[d.getUTCMonth()]
-  const year  = (d.getUTCFullYear() + 543).toString().slice(2)
-  const hh    = String(d.getUTCHours()).padStart(2, '0')
-  const mm    = String(d.getUTCMinutes()).padStart(2, '0')
+  // Shift UTC → Thailand Standard Time (UTC+7)
+  const thai = new Date(new Date(iso).getTime() + 7 * 60 * 60 * 1000)
+  const day   = thai.getUTCDate()
+  const month = MONTHS_SHORT[thai.getUTCMonth()]
+  const year  = (thai.getUTCFullYear() + 543).toString().slice(2)
+  const hh    = String(thai.getUTCHours()).padStart(2, '0')
+  const mm    = String(thai.getUTCMinutes()).padStart(2, '0')
   return `${day} ${month} ${year}, ${hh}:${mm}`
 }
 
