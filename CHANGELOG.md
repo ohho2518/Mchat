@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-06-08
+
+### OCR Fix + Train OCR UX + Header Version
+
+- Fixed: **OCR อ่านสลิป portrait ไม่ได้** — เปลี่ยน `detail: 'low'` → `detail: 'auto'` ใน `/api/parser/ocr` ให้ OpenAI ใช้หลาย tile สำหรับรูปสูง (Bangkok Bank, BBL ฯลฯ) แทนการบีบทั้งสลิปลงใน 512×512 tile เดียว
+- Added: **Parser result panel ใน Train OCR test tab** — หลังอัปโหลดรูป จะแสดงผล rule-based parser ทันที (ประเภท, จำนวน, วันที่, หมวดหมู่, confidence %) พร้อมปุ่ม Re-run สำหรับทดสอบหลังแก้ข้อความ
+- Added: **Version + deploy time ใน Header** — แสดง `v1.2.0 · 8 มิ.ย. 69, HH:MM` (Thai timezone UTC+7) ใต้ logo ทุกหน้า อัปเดตอัตโนมัติทุก deploy
+- Changed: version bump `0.1.0` → `1.2.0`
+
+---
+
 ## 2026-06-07
 
 ### Security Sprint 2 — S06–S09

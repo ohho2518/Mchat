@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-2026-06-07 — MerchantProfile (OCR Knowledge Layer) + Train OCR dedicated page
+2026-06-08 — OCR detail:auto fix + Train OCR parser panel + Header version/deploy time
 
 ---
 
@@ -144,6 +144,12 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
   - Admin page: User management section — list users + plan editor per row
   - `GET /api/user/quota` — ดึงสถานะ OCR quota ของ user
   - `src/components/ui/UpgradePrompt.tsx` — reusable upgrade prompt (compact + card)
+- [x] **OCR + Header improvements (2026-06-08)**:
+  - OCR route: `detail: 'low'` → `detail: 'auto'` — แก้สลิป portrait (Bangkok Bank ฯลฯ) อ่านไม่ได้เพราะถูกบีบเป็น 512×512 tile เดียว
+  - Train OCR test tab: เพิ่ม "ผลจาก Parser" panel — หลัง OCR รัน จะ call /api/parser/parse อัตโนมัติและแสดง type/amount/date/category/confidence พร้อมปุ่ม Re-run
+  - Header: แสดง version (จาก package.json) + deploy time (Thai timezone UTC+7) ใต้ logo ทุกหน้า
+  - next.config.ts: inject NEXT_PUBLIC_APP_VERSION + NEXT_PUBLIC_BUILD_TIME ที่ build time
+  - package.json: bump version 0.1.0 → 1.2.0
 - [x] **Train OCR System (2026-06-07)**:
   - OCR corrections flow: user consent → OcrCorrection record → admin review → apply keyword
   - `/admin/train-ocr` — dedicated admin page (3 tabs: ทดสอบ OCR, Review Corrections, Merchant Library)
