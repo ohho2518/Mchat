@@ -1,4 +1,4 @@
-const CACHE = 'mchat-v2'
+const CACHE = 'mchat-v3'
 
 // pre-cache เฉพาะ static assets เท่านั้น
 const PRECACHE = [
@@ -34,7 +34,9 @@ self.addEventListener('fetch', (e) => {
     fetch(e.request)
       .then((res) => {
         if (res.ok && res.status === 200) {
-          caches.open(CACHE).then((c) => c.put(e.request, res.clone()))
+          // clone ทันทีก่อน return — ไม่งั้น body ถูกใช้ไปแล้วตอน cache put ทำงาน (async)
+          const resClone = res.clone()
+          caches.open(CACHE).then((c) => c.put(e.request, resClone))
         }
         return res
       })

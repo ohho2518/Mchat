@@ -46,7 +46,8 @@ export async function POST(req: Request) {
     const result = parseTransactionText(parsed.data.text, categoryMap)
 
     return NextResponse.json(result)
-  } catch {
+  } catch (err) {
+    console.error('[api/parser/parse] error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
