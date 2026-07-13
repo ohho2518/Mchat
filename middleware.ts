@@ -13,6 +13,7 @@ const PUBLIC_PREFIXES = [
   '/api/ref/',
   '/api/referral/terms',
   '/api/cron/',   // Vercel Cron — secured by CRON_SECRET header inside each handler
+  '/api/health',  // uptime monitor ping — ไม่มีข้อมูล sensitive
 ]
 
 // S05: Admin IP allowlisting — set ADMIN_IP_ALLOWLIST env var (comma-separated)

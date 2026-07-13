@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-07-13
+
+### Keep-alive + Cron Observability (S12 follow-up)
+
+- Added: **`GET /api/health`** — public health check (ไม่ต้อง auth) คืน `{ ok, db, latencyMs, lastCronRun, time }` และคืน **503 เมื่อ DB ล่ม**
+  - ให้ uptime monitor ภายนอก (UptimeRobot / cron-job.org) ping ทุก 5–15 นาที → กัน **Supabase free-tier auto-pause** (pause เมื่อ idle 7 วัน — เคยทำ production ล่มเมื่อ 6 ก.ค.)
+  - เป็นช่องทางตรวจว่า cron รันจริงหรือไม่ โดยไม่ต้องเปิด Vercel logs
+- Added: **cron run record** — `/api/cron/data-retention` เขียน `SiteSetting['cron:data-retention:lastRun']` ทุกครั้งที่รันสำเร็จ (แม้ไม่มีอะไรถูกลบ) เป็นทั้งหลักฐานการรันและ DB write รายวัน
+- Fixed: **cron fail เงียบ** — `/api/cron/data-retention` เดิมไม่มี try/catch (ผิด coding rule) → error กลายเป็น unhandled 500 ที่ไม่มี log; เพิ่ม try/catch + `console.error` + `dynamic = 'force-dynamic'` + `maxDuration = 60`
+- Changed: `middleware.ts` — เพิ่ม `/api/health` เป็น public route
+
+---
+
 ## 2026-06-08
 
 ### OCR Fix + Train OCR UX + Header Version
