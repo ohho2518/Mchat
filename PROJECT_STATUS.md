@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-2026-06-08 — OCR detail:auto fix + Train OCR parser panel + Header version/deploy time
+2026-07-13 — Keep-alive `/api/health` + cron observability (กัน Supabase auto-pause)
 
 ---
 
@@ -22,6 +22,18 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 
 ## Completed
 
+- [x] **Keep-alive + Cron Observability (2026-07-13)**:
+  - `GET /api/health` — public, คืน `{ ok, db, latencyMs, lastCronRun, time }`, คืน 503 เมื่อ DB ล่ม
+  - ให้ uptime monitor ภายนอก ping ทุก 5–15 นาที → กัน Supabase free-tier auto-pause (เคยทำ production ล่ม 2026-07-06)
+  - `/api/cron/data-retention` — เพิ่ม try/catch (เดิมไม่มี → fail เงียบ), `force-dynamic`, `maxDuration=60`
+  - เขียน `SiteSetting['cron:data-retention:lastRun']` ทุกครั้งที่รันสำเร็จ — พิสูจน์ว่า cron รันจริง (ดูผ่าน /api/health)
+  - `src/lib/cron.ts` — CRON_LAST_RUN_KEY + CronRunRecord type
+  - `middleware.ts` — `/api/health` เป็น public route
+- [x] **Security Sprint 3 — S10–S13 (commit `6ee178e`)**:
+  - S10: `/settings/privacy` — Data Export + Delete Account request
+  - S11: Persistent Rate Limiting — `RateLimit` model ใน DB (แทน in-memory Map)
+  - S12: Data Retention Cron — `/api/cron/data-retention` + `vercel.json` cron (19:00 UTC = 02:00 ICT)
+  - S13: Commission Risk Flag
 - [x] Phase 0 — Environment Setup, Prisma Schema, Seed categories
 - [x] Phase 1 — Layout + UI Components (AppShell, BottomNav, Header, ui/*)
 - [x] Phase 2 — Database + API Layer (transactions, categories, dashboard APIs)
@@ -187,27 +199,22 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 
 ## Next Tasks
 
-### 🚀 Production QA (ทำก่อน)
-1. **QA ทดสอบ Referral flow** — Scan QR → /download → register → commission hook ทำงาน
-2. **ตั้งค่า Omise env vars บน Vercel** — `OMISE_SECRET_KEY` + `OMISE_PUBLIC_KEY`
-3. **ตั้งค่า Omise Webhook** — `https://your-domain.vercel.app/api/webhooks/omise`
-4. **QA Omise payment** — ทดสอบ Test mode (test card: 4242 4242 4242 4242)
-5. **Switch Omise to Live mode** — เมื่อพร้อม launch จริง
+> Sprint S01–S13 เขียนโค้ดครบแล้วทั้งหมด — ที่เหลือคือ **ตั้งค่าใน Dashboard + QA** (ไม่ใช่งานโค้ด)
 
-### 🔐 Security & PDPA Sprint 1 — Critical (ต้องทำก่อน Launch จริง)
-> แผนละเอียด: `docs/security/SECURITY_DEV_PLAN.md`
+### ⚙️ ตั้งค่าภายนอก (ทำเองใน Dashboard)
+1. 🔴 **Uptime monitor → `/api/health`** — สมัคร UptimeRobot (ฟรี) ping ทุก 5 นาที กัน Supabase auto-pause + แจ้งเตือนเมื่อ DB ล่ม
+2. 🔴 **Supabase RLS** — รัน SQL script ใน Supabase Dashboard
+3. 🔴 **`OMISE_WEBHOOK_SECRET`** ใน Vercel env — ต้องมีก่อนรับเงิน
+4. 🔴 **`RESEND_API_KEY`** — ตอนนี้ยังไม่ตั้ง → register auto-verify email (dev mode)
+5. 🟡 **`CRON_SECRET`** ใน Vercel env — ถ้าไม่ตั้ง cron route จะเปิดสาธารณะ
+6. 🟡 **Switch Omise → Live** (`skey_live_`) เมื่อพร้อมรับเงินจริง
+7. ⚪ **`ADMIN_IP_ALLOWLIST`** — ยังไม่ตั้งตามที่ user ขอ
 
-6. **[TASK-S01] Omise Webhook Signature Verify** — `src/app/api/webhooks/omise/route.ts` | ~2h
-7. **[TASK-S02] Supabase RLS** — Enable RLS ทุก table ผ่าน Supabase Dashboard | ~3h
-8. **[TASK-S03] Privacy Notice + user_consents table** — schema + register form + API | ~4h
-9. **[TASK-S04] /privacy-policy + /terms pages** — static pages, public routes | ~2h
-10. **[TASK-S05] Admin IP Allowlisting** — `middleware.ts` + `ADMIN_IP_ALLOWLIST` env | ~3h
-
-### 🟡 Security Sprint 2 — High Priority (ภายใน 2 สัปดาห์)
-11. **[TASK-S06] OCR Improvement Consent** — toggle ใน Settings + gate OcrCorrection save | ~3h
-12. **[TASK-S07] Audit Log table + auditLog()** — schema + utility + hook ใน admin actions | ~4h
-13. **[TASK-S08] Email Verification** — token-based, ส่ง email หลัง register | ~5h
-14. **[TASK-S09] Security Headers + CSP** — `next.config.ts` headers | ~1h
+### 🧪 QA ที่ยังไม่ได้ทำ
+8. **Referral flow** — Scan QR → /download → register → commission hook
+9. **Omise payment** — Test mode (test card: 4242 4242 4242 4242)
+10. **Email verification** — register → inbox → click → verified
+11. **OCR consent toggle** — on/off → ตรวจ DB
 
 ---
 
@@ -230,6 +237,9 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 ---
 
 ## Known Issues
+
+0. **Supabase free-tier auto-pause** — project pause เมื่อไม่มี activity 7 วัน → ทุก DB query พัง (`FATAL: tenant/user not found`) เกิดจริงเมื่อ 2026-07-06 ทำ production ล่ม
+   → บรรเทาแล้วด้วย daily cron + `/api/health` แต่ **ต้องตั้ง uptime monitor ให้ ping จริง** ถึงจะกันได้แน่นอน (หรือ upgrade Supabase Pro)
 
 1. **Transfer จากแชท ≠ Transfer ใน /transfers** — Transaction type=transfer ที่บันทึกจากแชทไม่มี fromAccountId/toAccountId จึงไม่แสดงในหน้า /transfers (ต้องสร้างผ่านหน้า /transfers เท่านั้น)
 

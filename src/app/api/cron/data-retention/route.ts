@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
+import { CRON_LAST_RUN_KEY, type CronRunRecord } from '@/lib/cron'
 
-// Called by Vercel Cron daily at 02:00 ICT
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
+// Called by Vercel Cron daily at 19:00 UTC = 02:00 ICT
 // Retention policy (from Privacy Policy):
 //   AppEvent      → 90 days
 //   OcrCorrection → 1 year
@@ -27,28 +32,37 @@ export async function GET(req: Request) {
   const twoYearsAgo = new Date(now)
   twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2)
 
-  const [events, corrections, auditLogs, rateLimits] = await Promise.all([
-    prisma.appEvent.deleteMany({ where: { createdAt: { lt: ninetyDaysAgo } } }),
-    prisma.ocrCorrection.deleteMany({ where: { createdAt: { lt: oneYearAgo } } }),
-    prisma.auditLog.deleteMany({ where: { createdAt: { lt: twoYearsAgo } } }),
-    prisma.rateLimit.deleteMany({ where: { resetAt: { lt: now } } }),
-  ])
+  try {
+    const [events, corrections, auditLogs, rateLimits] = await Promise.all([
+      prisma.appEvent.deleteMany({ where: { createdAt: { lt: ninetyDaysAgo } } }),
+      prisma.ocrCorrection.deleteMany({ where: { createdAt: { lt: oneYearAgo } } }),
+      prisma.auditLog.deleteMany({ where: { createdAt: { lt: twoYearsAgo } } }),
+      prisma.rateLimit.deleteMany({ where: { resetAt: { lt: now } } }),
+    ])
 
-  console.log('[cron] data-retention', {
-    appEvents: events.count,
-    ocrCorrections: corrections.count,
-    auditLogs: auditLogs.count,
-    expiredRateLimits: rateLimits.count,
-    ranAt: now.toISOString(),
-  })
+    const record: CronRunRecord = {
+      ranAt: now.toISOString(),
+      deleted: {
+        appEvents:         events.count,
+        ocrCorrections:    corrections.count,
+        auditLogs:         auditLogs.count,
+        expiredRateLimits: rateLimits.count,
+      },
+    }
 
-  return NextResponse.json({
-    ok: true,
-    deleted: {
-      appEvents:         events.count,
-      ocrCorrections:    corrections.count,
-      auditLogs:         auditLogs.count,
-      expiredRateLimits: rateLimits.count,
-    },
-  })
+    // เขียนทุกครั้งแม้ไม่มีอะไรถูกลบ — เป็นหลักฐานว่า cron รันจริง (ดูผ่าน /api/health)
+    const value = JSON.stringify(record)
+    await prisma.siteSetting.upsert({
+      where:  { key: CRON_LAST_RUN_KEY },
+      create: { key: CRON_LAST_RUN_KEY, value },
+      update: { value },
+    })
+
+    console.log('[cron] data-retention', record)
+
+    return NextResponse.json({ ok: true, deleted: record.deleted })
+  } catch (err) {
+    console.error('[cron] data-retention failed', err)
+    return NextResponse.json({ error: 'Data retention job failed' }, { status: 500 })
+  }
 }

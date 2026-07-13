@@ -54,6 +54,8 @@ src/
     download/page.tsx       ← landing page (public, ไม่ต้อง auth)
     ref/[code]/page.tsx     ← referral redirect → /download (public)
     api/
+      health/               ← GET public health check (db status + lastCronRun) — uptime monitor ping
+      cron/data-retention/  ← GET Vercel Cron (daily 02:00 ICT) — ลบข้อมูลเก่าตาม retention policy
       auth/[...nextauth]/   ← NextAuth handler
       auth/register/        ← POST สร้าง account ใหม่
       user/                 ← PATCH update profile/password
@@ -108,6 +110,7 @@ src/
 
   lib/
     auth.ts                 ← NextAuth config
+    cron.ts                 ← CRON_LAST_RUN_KEY, CronRunRecord (cron ↔ /api/health)
     features.ts             ← PLAN_LIMITS, PLAN_LABELS, PLAN_COLORS, PLAN_PRICES
     referral.ts             ← generateReferralCode()
     commission.ts           ← COMMISSION_TABLE, getPlanCode, createCommissionAfterPayment()
@@ -257,6 +260,14 @@ User กดปุ่มกล้อง → เลือกรูป/ถ่าย
 - `Transaction` มี field `holderName` (String?) — ชื่อคู่ค้าจากสลิป OCR
 - `User` มี field `plan` (FREE/PRO/MAX), `planExpiresAt`
 - CRUD API+UI ครบ: accounts, transfers, debts
+
+---
+
+### Keep-alive / Cron
+- Supabase free tier **pause project เมื่อไม่มี activity 7 วัน** → ทุก DB query พัง (เกิดจริง 2026-07-06)
+- กันด้วย 2 ชั้น: Vercel Cron รายวัน (`/api/cron/data-retention`) + uptime monitor ภายนอก ping `/api/health` ทุก 5–15 นาที
+- Cron เขียน `SiteSetting['cron:data-retention:lastRun']` ทุกครั้งที่รันสำเร็จ → เช็คว่ารันจริงไหมได้จาก `/api/health` (ไม่ต้องเปิด Vercel logs)
+- Cron route ป้องกันด้วย `CRON_SECRET` (Bearer header) — ถ้าไม่ตั้ง env นี้ route จะเปิดสาธารณะ
 
 ---
 
