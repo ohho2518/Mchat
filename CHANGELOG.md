@@ -6,6 +6,16 @@
 
 ## 2026-07-13
 
+### 🔥 Fix: auth guard ไม่เคยทำงานบน production
+
+- Fixed: **Next.js 16 อ่าน `proxy.ts` ไม่ใช่ `middleware.ts`** — logic ของ Security Sprint (public routes + admin IP gate) ถูกเขียนไว้ใน `middleware.ts` ที่ root ซึ่ง Next.js 16 **เมินเงียบ ๆ ไม่มี warning** ตัวที่รันจริงคือ `src/proxy.ts` เวอร์ชันแรกสุด
+  - ผลกระทบจริงบน production ~1 เดือน:
+    - `/privacy-policy` + `/terms` เปิดไม่ได้ถ้าไม่ล็อกอิน (ขัดข้อกำหนด PDPA)
+    - `/api/referral/terms` ไม่ public จริง
+    - **`/api/cron/data-retention` โดน redirect ไป `/login` ทุกวัน → ไม่เคยแตะ DB เลย → เป็นเหตุให้ Supabase pause เมื่อ 2026-07-06**
+    - S05 Admin IP allowlisting ไม่เคยทำงาน
+  - แก้: ย้าย logic ทั้งหมดไป `src/proxy.ts`, ลบ `middleware.ts` ทิ้ง, ใส่คอมเมนต์เตือนกันพลาดซ้ำ
+
 ### Keep-alive + Cron Observability (S12 follow-up)
 
 - Added: **`GET /api/health`** — public health check (ไม่ต้อง auth) คืน `{ ok, db, latencyMs, lastCronRun, time }` และคืน **503 เมื่อ DB ล่ม**

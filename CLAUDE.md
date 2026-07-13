@@ -129,7 +129,7 @@ src/
   types/transaction.ts, dashboard.ts
   data/seedCategories.ts
 
-middleware.ts               ← withAuth: public routes = /login, /download, /ref/*, /api/auth/**
+  proxy.ts                  ← ⚠️ auth guard (Next.js 16 อ่านไฟล์นี้ ไม่ใช่ middleware.ts) — withAuth + public routes + admin IP gate
 prisma/schema.prisma, seed.ts, migrations/
 public/manifest.json, sw.js, icons/
 tests/parser/parseTransactionText.test.ts  ← 44 test cases
@@ -219,7 +219,8 @@ User types text
 ```
 
 ### Auth Flow
-- `middleware.ts` ใช้ `withAuth` จาก NextAuth — redirect ทุก route ไป `/login` ยกเว้น `/login`, `/api/auth/**`
+- **`src/proxy.ts`** คือ auth guard ตัวจริง — **Next.js 16 เปลี่ยนชื่อ `middleware.ts` → `proxy.ts`** ถ้าไปเขียน logic ไว้ใน `middleware.ts` Next จะ**เมินเงียบ ๆ ไม่มี error** (เคยพลาดมาแล้ว: public routes + Vercel cron ตายสนิทบน production นาน 1 เดือน จน Supabase pause)
+- ใช้ `withAuth` จาก NextAuth — redirect ทุก route ไป `/login` ยกเว้น PUBLIC_PREFIXES (`/login`, `/download`, `/privacy-policy`, `/terms`, `/ref/*`, `/api/auth/*`, `/api/ref/*`, `/api/referral/terms`, `/api/cron/*`, `/api/health`)
 - JWT token เก็บ `userId` ผ่าน `callbacks.jwt` → `callbacks.session` → `session.user.id`
 - ทุก API route: `getServerSession(authOptions)` → 401 ถ้าไม่มี session
 
@@ -361,7 +362,7 @@ User กดปุ่มกล้อง → เลือกรูป/ถ่าย
 | `src/app/pricing/page.tsx` | PaymentModal (Omise + manual PromptPay) |
 | `src/app/referral/page.tsx` | Referral dashboard |
 | `src/app/admin/page.tsx` | Admin panel (auth: ADMIN_EMAIL) |
-| `middleware.ts` | auth guard (route protection) |
+| `src/proxy.ts` | auth guard (route protection) — **ไม่ใช่** `middleware.ts` (Next 16 เมินไฟล์นั้น) |
 | `prisma/schema.prisma` | DB schema ครบ |
 | `src/data/seedCategories.ts` | parser keywords + default categories |
 | `src/lib/validators/transaction.ts` | Zod schemas ใช้ทั้ง API + frontend |
