@@ -22,6 +22,12 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 
 ## Completed
 
+- [x] **🔥 Fix: auth guard ไม่เคยทำงานบน production (2026-07-13)**:
+  - **Next.js 16 เปลี่ยนชื่อ `middleware.ts` → `proxy.ts`** — Security Sprint เขียน logic ไว้ใน `middleware.ts` (root) ซึ่ง Next เมินเงียบ ๆ ไม่มี error
+  - ตัวที่รันจริงคือ `src/proxy.ts` เวอร์ชันแรกสุด (public แค่ `login|download|ref|api/auth`)
+  - ผลกระทบที่เกิดจริงมา ~1 เดือน: `/privacy-policy` + `/terms` เปิดไม่ได้ถ้าไม่ล็อกอิน (ผิด PDPA), `/api/referral/terms` ไม่ public, **`/api/cron/data-retention` โดน redirect ไป /login ทุกวัน → ไม่เคยแตะ DB → Supabase pause 2026-07-06**, S05 admin IP allowlist ไม่ทำงาน
+  - แก้: ย้าย logic ทั้งหมดไป `src/proxy.ts` + ลบ `middleware.ts` ทิ้ง
+  - ทดสอบ route matrix ครบ: public 6 route = 200 / cron ไม่มี secret = 401 / protected 6 route = 307
 - [x] **Keep-alive + Cron Observability (2026-07-13)**:
   - `GET /api/health` — public, คืน `{ ok, db, latencyMs, lastCronRun, time }`, คืน 503 เมื่อ DB ล่ม
   - ให้ uptime monitor ภายนอก ping ทุก 5–15 นาที → กัน Supabase free-tier auto-pause (เคยทำ production ล่ม 2026-07-06)
@@ -225,7 +231,7 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 | `src/lib/parser/parseTransactionText.ts` | parser entry point — core business logic |
 | `src/lib/auth.ts` | NextAuth config |
 | `src/app/chat/page.tsx` | main user flow: parse → confirm → save |
-| `middleware.ts` | auth guard (route protection) |
+| `src/proxy.ts` | auth guard (route protection) — Next 16 ใช้ชื่อ proxy.ts ไม่ใช่ middleware.ts |
 | `prisma/schema.prisma` | DB schema ครบ |
 | `src/data/seedCategories.ts` | parser keywords + default categories |
 | `src/lib/validators/transaction.ts` | Zod schemas ใช้ทั้ง API + frontend |

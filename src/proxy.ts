@@ -1,13 +1,71 @@
 import { withAuth } from 'next-auth/middleware'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-export default withAuth({
-  pages: {
-    signIn: '/login',
+// ⚠️ Next.js 16 อ่านไฟล์นี้ (proxy.ts) เป็น middleware — ไฟล์ชื่อ middleware.ts ที่ root จะถูกเมินเงียบ ๆ
+// อย่าย้าย logic กลับไป middleware.ts เด็ดขาด (เคยพลาดมาแล้ว: public routes + cron ทั้งชุดตายสนิทบน production)
+
+// Routes accessible without authentication
+const PUBLIC_PREFIXES = [
+  '/login',
+  '/download',
+  '/privacy-policy',
+  '/terms',
+  '/ref/',
+  '/api/auth/',
+  '/api/ref/',
+  '/api/referral/terms',
+  '/api/cron/',   // Vercel Cron — secured by CRON_SECRET header inside each handler
+  '/api/health',  // uptime monitor ping — ไม่มีข้อมูล sensitive
+]
+
+// S05: Admin IP allowlisting — set ADMIN_IP_ALLOWLIST env var (comma-separated)
+function checkAdminAccess(req: NextRequest): boolean {
+  const allowlist = process.env.ADMIN_IP_ALLOWLIST
+  if (!allowlist) return true // not configured → allow (rely on session check)
+
+  const ips = allowlist.split(',').map(s => s.trim()).filter(Boolean)
+  if (ips.length === 0) return true
+
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? ''
+  return ips.includes(ip)
+}
+
+export default withAuth(
+  function proxy(req: NextRequest) {
+    const { pathname } = req.nextUrl
+
+    // Admin IP gate (S05)
+    if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
+      if (!checkAdminAccess(req)) {
+        const loginUrl = new URL('/login', req.url)
+        return NextResponse.redirect(loginUrl)
+      }
+    }
+
+    return NextResponse.next()
   },
-})
+  {
+    callbacks: {
+      authorized({ req, token }) {
+        const { pathname } = req.nextUrl
+
+        // Public routes — no token required
+        if (PUBLIC_PREFIXES.some(p => pathname.startsWith(p))) return true
+
+        // Everything else requires a valid session token
+        return !!token
+      },
+    },
+    pages: {
+      signIn: '/login',
+    },
+  }
+)
 
 export const config = {
+  // Match all routes except Next.js internals + static files
   matcher: [
-    '/((?!login|download|ref|api/auth|_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|icons/|manifest\\.json|sw\\.js).*)',
   ],
 }
