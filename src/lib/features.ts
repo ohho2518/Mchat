@@ -60,6 +60,23 @@ export const CREDIT_PACKS = [
 ] as const
 export type CreditPack = typeof CREDIT_PACKS[number]
 
+// ─── Authoritative pricing (server + client ใช้ร่วมกัน — ห้ามเชื่อ amount จาก client) ──
+// ส่วนลดตามระยะเวลา — ต้องตรงกับ PERIOD_OPTIONS ในหน้า /pricing
+export const PERIOD_DISCOUNTS: Record<number, number> = { 1: 0, 3: 0, 6: 0.1, 12: 0.17 }
+export const VALID_PLAN_MONTHS: number[] = [1, 3, 6, 12]
+
+// คำนวณยอดที่ต้องชำระจาก plan + จำนวนเดือน (source of truth)
+export function computePlanAmount(plan: 'pro' | 'max', months: number): number {
+  const base = PLAN_PRICES[plan].monthly
+  const discount = PERIOD_DISCOUNTS[months] ?? 0
+  return Math.round(base * months * (1 - discount))
+}
+
+// หา credit pack จากจำนวนเครดิต (คืน undefined ถ้าไม่ตรง pack ที่มีขาย)
+export function findCreditPack(credits: number): CreditPack | undefined {
+  return CREDIT_PACKS.find((p) => p.credits === credits)
+}
+
 // Thai timezone month string (UTC+7) — used for OCR quota keying
 export function getThaiMonth(): string {
   const TH_OFFSET_MS = 7 * 60 * 60 * 1000

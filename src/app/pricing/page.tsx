@@ -697,6 +697,7 @@ export default function PricingPage() {
   const [phoneLoading,    setPhoneLoading]    = useState(true)
   const [pendingPayment,  setPendingPayment]  = useState(false)
   const [stripeResult,    setStripeResult]    = useState<'success' | 'cancel' | null>(null)
+  const [stripeStatus,    setStripeStatus]    = useState<'checking' | 'paid' | 'failed' | 'timeout' | null>(null)
 
   const currentPlan = (session?.user?.plan ?? 'free') as Plan
 
@@ -713,8 +714,9 @@ export default function PricingPage() {
 
     fetch('/api/payments')
       .then(r => r.ok ? r.json() : [])
-      .then((payments: { status: string }[]) => {
-        setPendingPayment(payments.some(p => p.status === 'pending'))
+      .then((payments: { status: string; method: string }[]) => {
+        // Stripe pending = checkout ที่ยังไม่จ่าย/ทิ้งไว้ (auto) — ไม่นับเป็น "รอ admin" และไม่ block modal
+        setPendingPayment(payments.some(p => p.status === 'pending' && p.method !== 'stripe'))
       })
       .catch(() => {})
   }, [])
@@ -733,20 +735,23 @@ export default function PricingPage() {
 
     const sessionId = params.get('session_id')
     setStripeResult('success')
-    if (!sessionId) return
+    // ยังไม่ยืนยันว่าสำเร็จ — PromptPay อาจ redirect กลับก่อนเงินเข้าจริง → ตรวจสถานะจริงก่อน
+    setStripeStatus('checking')
+    if (!sessionId) { setStripeStatus('timeout'); return }
 
-    // Poll สถานะจนกว่า webhook จะ fulfill (สูงสุด ~20 วิ) — webhook อาจ lag เล็กน้อย
+    // Poll สถานะจริงจาก DB (webhook เป็นคนอัปเดต) สูงสุด ~20 วิ
     let ticks = 0
     const iv = setInterval(async () => {
       ticks++
       try {
         const r = await fetch(`/api/stripe/status?session_id=${sessionId}`)
         if (r.ok) {
-          const { paid } = await r.json()
-          if (paid) { clearInterval(iv); setPendingPayment(false) }
+          const { status } = await r.json()
+          if (status === 'paid')   { clearInterval(iv); setStripeStatus('paid'); setPendingPayment(false); return }
+          if (status === 'failed') { clearInterval(iv); setStripeStatus('failed'); return }
         }
-      } catch { /* ignore */ }
-      if (ticks >= 10) clearInterval(iv)
+      } catch { /* network blip — continue polling */ }
+      if (ticks >= 10) { clearInterval(iv); setStripeStatus((s) => (s === 'checking' ? 'timeout' : s)) }
     }, 2000)
     return () => clearInterval(iv)
   }, [])
@@ -758,11 +763,29 @@ export default function PricingPage() {
         <p className="text-sm text-gray-500 mt-1">เลือกแผนที่เหมาะกับการใช้งานของคุณ</p>
       </div>
 
-      {/* Stripe redirect result */}
-      {stripeResult === 'success' && (
+      {/* Stripe redirect result — แสดงตามสถานะจริงจาก webhook (ไม่ assume สำเร็จ) */}
+      {stripeResult === 'success' && stripeStatus === 'checking' && (
+        <div className="rounded-xl bg-blue-50 border border-blue-200 p-4 text-sm text-blue-800 flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+          <p>กำลังตรวจสอบการชำระเงิน...</p>
+        </div>
+      )}
+      {stripeResult === 'success' && stripeStatus === 'paid' && (
         <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800">
           <p className="font-medium mb-1">✅ ชำระเงินสำเร็จ!</p>
-          <p className="text-xs text-green-600">ระบบกำลังอัปเดตแผนของคุณ — หากยังไม่เปลี่ยน กรุณา sign-out แล้ว sign-in ใหม่เพื่อให้มีผล</p>
+          <p className="text-xs text-green-600">แผนของคุณอัปเดตแล้ว — หากยังไม่เปลี่ยน กรุณา sign-out แล้ว sign-in ใหม่เพื่อให้มีผล</p>
+        </div>
+      )}
+      {stripeResult === 'success' && stripeStatus === 'failed' && (
+        <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-800">
+          <p className="font-medium mb-1">❌ การชำระเงินไม่สำเร็จ</p>
+          <p className="text-xs text-red-600">ยังไม่มีการตัดเงิน — คุณสามารถเลือกแผนและลองชำระใหม่ได้</p>
+        </div>
+      )}
+      {stripeResult === 'success' && stripeStatus === 'timeout' && (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
+          <p className="font-medium mb-1">⏳ กำลังยืนยันการชำระเงิน</p>
+          <p className="text-xs text-amber-600">อาจใช้เวลาสักครู่ — ลองรีเฟรชหน้านี้อีกครั้ง หากตัดเงินแล้วแผนจะอัปเดตอัตโนมัติ</p>
         </div>
       )}
       {stripeResult === 'cancel' && (

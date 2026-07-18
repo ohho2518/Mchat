@@ -8,49 +8,45 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 // เปิดใช้แผน / เติมเครดิต จาก Checkout Session ที่ชำระสำเร็จ — idempotent
+// ใช้ conditional updateMany (status != paid → paid) เป็น atomic lock:
+// ถ้า event ถูกส่งซ้ำ/ซ้อนกัน จะมีแค่ครั้งเดียวที่ claim.count === 1 → กันเติมเครดิต/commission ซ้ำ
 async function fulfill(sessionObj: Stripe.Checkout.Session) {
   const paymentId = sessionObj.metadata?.paymentId ?? sessionObj.client_reference_id ?? undefined
   if (!paymentId) return
 
   const payment = await prisma.payment.findUnique({ where: { id: paymentId } })
-  // ไม่พบ, ประมวลผลไปแล้ว → ข้าม (idempotent)
-  if (!payment || payment.status === 'paid') return
+  if (!payment || payment.status === 'paid') return // fast-path (guard จริงคือ atomic claim ด้านล่าง)
 
-  // ── กรณีอัปเกรดแผน ──────────────────────────────────────────────────────────
-  if (payment.plan) {
-    const expiresAt = new Date()
-    expiresAt.setMonth(expiresAt.getMonth() + payment.months)
+  const claimed = await prisma.$transaction(async (tx) => {
+    // Atomic claim — เฉพาะ transaction แรกที่พลิก pending/failed → paid เท่านั้นที่ได้ count 1
+    const claim = await tx.payment.updateMany({
+      where: { id: payment.id, status: { not: 'paid' } },
+      data:  { status: 'paid', paidAt: new Date() },
+    })
+    if (claim.count === 0) return false // มีคน fulfill ไปแล้ว (duplicate delivery)
 
-    await prisma.$transaction([
-      prisma.payment.update({
-        where: { id: payment.id },
-        data:  { status: 'paid', paidAt: new Date() },
-      }),
-      prisma.user.update({
+    if (payment.plan) {
+      const expiresAt = new Date()
+      expiresAt.setMonth(expiresAt.getMonth() + payment.months)
+      await tx.user.update({
         where: { id: payment.userId },
         data:  { plan: payment.plan, planExpiresAt: expiresAt },
-      }),
-    ])
+      })
+    } else if (payment.credits) {
+      await tx.user.update({
+        where: { id: payment.userId },
+        data:  { ocrCredits: { increment: payment.credits } },
+      })
+    }
+    return true
+  })
 
+  // Commission เฉพาะกรณี claim สำเร็จ + เป็นการอัปเกรดแผน (createCommissionAfterPayment idempotent ในตัวด้วย)
+  if (claimed && payment.plan) {
     createCommissionAfterPayment(
       { id: payment.id, userId: payment.userId, plan: payment.plan, months: payment.months },
       sessionObj.metadata?.refCode ?? null,
     ).catch((err) => console.error('Commission error:', err))
-    return
-  }
-
-  // ── กรณีซื้อเครดิต OCR ────────────────────────────────────────────────────────
-  if (payment.credits) {
-    await prisma.$transaction([
-      prisma.payment.update({
-        where: { id: payment.id },
-        data:  { status: 'paid', paidAt: new Date() },
-      }),
-      prisma.user.update({
-        where: { id: payment.userId },
-        data:  { ocrCredits: { increment: payment.credits } },
-      }),
-    ])
   }
 }
 

@@ -32,6 +32,8 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
   - แนวทางจาก `D:\Dev_Proj\d_PDFx\SAAS_DEV_PLAN.md` (Stripe Checkout PromptPay+บัตร THB, webhook idempotent)
   - **🔥 Fix: `/api/webhooks/*` ไม่เคยเป็น public route** ใน `proxy.ts` → ถ้า go-live webhook จะโดน redirect 307 (คลาสเดียวกับบั๊ก cron) แก้แล้ว
   - Omise เดิม: ไม่แตะโค้ด ปิดใช้ด้วยการไม่ตั้ง env — เก็บไว้เป็น provider สำรอง
+  - **Post-review hardening (2026-07-18):** server คำนวณราคาเอง (`computePlanAmount`/`findCreditPack` ใน features.ts — กันจ่ายต่ำกว่าราคาจริง) · `expires_at` +60 นาที (กัน Stripe reject) · status route try/catch · webhook fulfill เป็น atomic claim (กันเติมเครดิต/commission ซ้ำ) · success banner ตรวจสถานะจริงก่อน (checking/paid/failed/timeout) · Stripe pending ไม่ block manual flow — เหลือ #7 (Origin header, low) ยังไม่แก้
+  - **ทิศทาง provider (ยืนยัน 2026-07-18):** ใช้ **Stripe** (user มีบัญชี Approved อยู่แล้วจาก dPDFx) · อนาคตทำ **auto-renew** → ต้องยกระดับเป็น Checkout `mode:'subscription'` + Stripe Billing (เฟสถัดไป, ตอนนี้เป็น one-time)
 - [x] **🔥 Fix: auth guard ไม่เคยทำงานบน production (2026-07-13)**:
   - **Next.js 16 เปลี่ยนชื่อ `middleware.ts` → `proxy.ts`** — Security Sprint เขียน logic ไว้ใน `middleware.ts` (root) ซึ่ง Next เมินเงียบ ๆ ไม่มี error
   - ตัวที่รันจริงคือ `src/proxy.ts` เวอร์ชันแรกสุด (public แค่ `login|download|ref|api/auth`)
