@@ -15,11 +15,12 @@ export function getStripe(): Stripe {
 
 export const STRIPE_ENABLED = Boolean(process.env.STRIPE_SECRET_KEY)
 
-// Base URL สำหรับ success/cancel redirect — เอาจาก request origin ก่อน แล้ว fallback env
+// Base URL สำหรับ success/cancel redirect
+// ⚠️ ใช้ NEXTAUTH_URL ที่ config ไว้เป็นหลักเสมอ — ไม่เชื่อ Origin header จาก client
+// (Origin ปลอมได้ → success_url/cancel_url ชี้ไปโดเมนปลอมเพื่อ phishing หลังจ่ายเงิน)
+// เหลือ Origin ไว้เป็น dev fallback เท่านั้น กรณีไม่ได้ตั้ง NEXTAUTH_URL
 export function getBaseUrl(req: Request): string {
-  return (
-    req.headers.get('origin') ??
-    process.env.NEXTAUTH_URL ??
-    'http://localhost:3000'
-  )
+  const configured = process.env.NEXTAUTH_URL
+  if (configured) return configured.replace(/\/+$/, '')
+  return req.headers.get('origin') ?? 'http://localhost:3000'
 }
