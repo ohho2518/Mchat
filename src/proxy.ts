@@ -17,6 +17,7 @@ const PUBLIC_PREFIXES = [
   '/api/referral/terms',
   '/api/cron/',   // Vercel Cron — secured by CRON_SECRET header inside each handler
   '/api/health',  // uptime monitor ping — ไม่มีข้อมูล sensitive
+  '/api/webhooks/', // payment webhooks (Stripe/Omise) — เรียกจากภายนอกโดยไม่มี session; secured ด้วย signature ในแต่ละ handler
 ]
 
 // S05: Admin IP allowlisting — set ADMIN_IP_ALLOWLIST env var (comma-separated)

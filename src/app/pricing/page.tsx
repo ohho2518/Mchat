@@ -58,20 +58,21 @@ function featureCell(val: string | boolean) {
 }
 
 // ─── Payment Modal ────────────────────────────────────────────────────────────
-type PaymentTab = 'omise_promptpay' | 'omise_card' | 'manual'
+type PaymentTab = 'stripe' | 'omise_promptpay' | 'omise_card' | 'manual'
 
 interface PaymentModalProps {
   plan: 'pro' | 'max'
   promptpayPhone: string | null
   omisePublicKey: string | null
+  stripeEnabled: boolean
   phoneLoading: boolean
   onClose: () => void
   onSuccess: () => void
 }
 
-function PaymentModal({ plan, promptpayPhone, omisePublicKey, phoneLoading, onClose, onSuccess }: PaymentModalProps) {
+function PaymentModal({ plan, promptpayPhone, omisePublicKey, stripeEnabled, phoneLoading, onClose, onSuccess }: PaymentModalProps) {
   const omiseEnabled = Boolean(omisePublicKey)
-  const [tab,      setTab]     = useState<PaymentTab>(omiseEnabled ? 'omise_promptpay' : 'manual')
+  const [tab,      setTab]     = useState<PaymentTab>(stripeEnabled ? 'stripe' : omiseEnabled ? 'omise_promptpay' : 'manual')
   const [period,   setPeriod]  = useState(PERIOD_OPTIONS[0])
   const [refCode,  setRefCode] = useState('')
   const [loading,  setLoading] = useState(false)
@@ -178,6 +179,20 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, phoneLoading, onCl
     })
   }
 
+  const createStripeCheckout = async () => {
+    setLoading(true); setError(null)
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'plan', plan, months: period.months, amount, refCode: refCode.trim() || undefined }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.url) { setError(data.error ?? 'ไม่สามารถเริ่มการชำระได้'); return }
+      window.location.assign(data.url)   // redirect ไป Stripe Checkout
+    } catch { setError('ไม่สามารถเชื่อมต่อ Stripe ได้'); setLoading(false) }
+    // ไม่ต้อง setLoading(false) เมื่อสำเร็จ — กำลัง redirect ออกจากหน้า
+  }
+
   const submitManual = async () => {
     setLoading(true); setError(null)
     try {
@@ -210,10 +225,12 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, phoneLoading, onCl
   }
 
   const TABS: { key: PaymentTab; label: string; icon: React.ReactNode; show: boolean }[] = [
+    { key: 'stripe',          label: 'บัตร/PromptPay', icon: <CreditCard className="h-3.5 w-3.5" />, show: stripeEnabled },
     { key: 'omise_promptpay', label: 'PromptPay',  icon: <Smartphone className="h-3.5 w-3.5" />, show: omiseEnabled },
     { key: 'omise_card',      label: 'บัตร',        icon: <CreditCard className="h-3.5 w-3.5" />,  show: omiseEnabled },
     { key: 'manual',          label: 'โอนเอง',      icon: <QrCode className="h-3.5 w-3.5" />,      show: true },
   ]
+  const showTabBar = stripeEnabled || omiseEnabled
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
@@ -283,7 +300,7 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, phoneLoading, onCl
             </div>
 
             {/* Payment method tabs */}
-            {omiseEnabled && (
+            {showTabBar && (
               <div className="flex gap-1.5 mb-4 p-1 bg-gray-100 rounded-xl">
                 {TABS.filter(t => t.show).map(t => (
                   <button
@@ -297,6 +314,28 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, phoneLoading, onCl
                     {t.icon}{t.label}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* ── Tab: Stripe Checkout (redirect) ── */}
+            {tab === 'stripe' && (
+              <div className="flex flex-col items-center py-4 space-y-3 mb-4">
+                <CreditCard className="h-12 w-12 text-gray-300" />
+                <p className="text-sm text-gray-500 text-center">
+                  ชำระด้วยบัตรเครดิต/เดบิต หรือ PromptPay<br/>
+                  ผ่านหน้าชำระเงินที่ปลอดภัยของ Stripe
+                </p>
+                <button
+                  onClick={createStripeCheckout}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                  {loading ? 'กำลังเชื่อมต่อ...' : `ชำระ ฿${amount.toLocaleString()}`}
+                </button>
+                <p className="text-xs text-gray-400 text-center">
+                  Plan จะอัปเดตอัตโนมัติหลังชำระสำเร็จ · ข้อมูลบัตรจัดการโดย Stripe
+                </p>
               </div>
             )}
 
@@ -439,9 +478,10 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, phoneLoading, onCl
 }
 
 // ─── Credit Modal ────────────────────────────────────────────────────────────
-function CreditModal({ pack, promptpayPhone, onClose, onSuccess }: {
+function CreditModal({ pack, promptpayPhone, stripeEnabled, onClose, onSuccess }: {
   pack:           CreditPack
   promptpayPhone: string | null
+  stripeEnabled:  boolean
   onClose:        () => void
   onSuccess:      () => void
 }) {
@@ -453,6 +493,20 @@ function CreditModal({ pack, promptpayPhone, onClose, onSuccess }: {
   const payload = promptpayPhone
     ? generatePromptPayPayload(promptpayPhone, pack.price)
     : null
+
+  const payWithStripe = async () => {
+    setLoading(true); setError(null)
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ kind: 'credits', credits: pack.credits, amount: pack.price }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.url) { setError(data.error ?? 'ไม่สามารถเริ่มการชำระได้'); return }
+      window.location.assign(data.url)
+    } catch { setError('ไม่สามารถเชื่อมต่อ Stripe ได้'); setLoading(false) }
+  }
 
   const submit = async () => {
     setLoading(true); setError(null)
@@ -493,6 +547,22 @@ function CreditModal({ pack, promptpayPhone, onClose, onSuccess }: {
           </div>
         ) : (
           <>
+            {/* Stripe — ช่องทางหลัก (บัตร/PromptPay อัตโนมัติ) */}
+            {stripeEnabled && (
+              <>
+                <button
+                  onClick={payWithStripe}
+                  disabled={loading}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+                  {loading ? 'กำลังเชื่อมต่อ...' : `ชำระ ฿${pack.price} (บัตร/PromptPay)`}
+                </button>
+                <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                  <div className="h-px flex-1 bg-gray-200" /> หรือโอนเอง <div className="h-px flex-1 bg-gray-200" />
+                </div>
+              </>
+            )}
             {payload && promptpayPhone && (
               <div className="flex flex-col items-center gap-2">
                 <div ref={canvasRef} className="p-3 rounded-2xl border border-gray-100 bg-white shadow-sm">
@@ -623,8 +693,10 @@ export default function PricingPage() {
   const [selectedCredits, setSelectedCredits] = useState<CreditPack | null>(null)
   const [promptpayPhone,  setPromptpayPhone]  = useState<string | null>(null)
   const [omisePublicKey,  setOmisePublicKey]  = useState<string | null>(null)
+  const [stripeEnabled,   setStripeEnabled]   = useState(false)
   const [phoneLoading,    setPhoneLoading]    = useState(true)
   const [pendingPayment,  setPendingPayment]  = useState(false)
+  const [stripeResult,    setStripeResult]    = useState<'success' | 'cancel' | null>(null)
 
   const currentPlan = (session?.user?.plan ?? 'free') as Plan
 
@@ -634,6 +706,7 @@ export default function PricingPage() {
       .then(data => {
         setPromptpayPhone(data?.promptpayPhone ?? null)
         setOmisePublicKey(data?.omisePublicKey ?? null)
+        setStripeEnabled(Boolean(data?.stripeEnabled))
       })
       .catch(() => {})
       .finally(() => setPhoneLoading(false))
@@ -646,12 +719,57 @@ export default function PricingPage() {
       .catch(() => {})
   }, [])
 
+  // จัดการ redirect กลับจาก Stripe Checkout (?stripe=success&session_id=... | ?stripe=cancel)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const outcome = params.get('stripe')
+    if (!outcome) return
+
+    // ล้าง query param ออกจาก URL (กัน refresh แล้วเด้งซ้ำ)
+    window.history.replaceState(null, '', '/pricing')
+
+    if (outcome === 'cancel') { setStripeResult('cancel'); return }
+    if (outcome !== 'success') return
+
+    const sessionId = params.get('session_id')
+    setStripeResult('success')
+    if (!sessionId) return
+
+    // Poll สถานะจนกว่า webhook จะ fulfill (สูงสุด ~20 วิ) — webhook อาจ lag เล็กน้อย
+    let ticks = 0
+    const iv = setInterval(async () => {
+      ticks++
+      try {
+        const r = await fetch(`/api/stripe/status?session_id=${sessionId}`)
+        if (r.ok) {
+          const { paid } = await r.json()
+          if (paid) { clearInterval(iv); setPendingPayment(false) }
+        }
+      } catch { /* ignore */ }
+      if (ticks >= 10) clearInterval(iv)
+    }, 2000)
+    return () => clearInterval(iv)
+  }, [])
+
   return (
     <div className="p-4 space-y-6 pb-10 max-w-lg mx-auto">
       <div>
         <h1 className="text-xl font-bold text-gray-900">แผนราคา</h1>
         <p className="text-sm text-gray-500 mt-1">เลือกแผนที่เหมาะกับการใช้งานของคุณ</p>
       </div>
+
+      {/* Stripe redirect result */}
+      {stripeResult === 'success' && (
+        <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800">
+          <p className="font-medium mb-1">✅ ชำระเงินสำเร็จ!</p>
+          <p className="text-xs text-green-600">ระบบกำลังอัปเดตแผนของคุณ — หากยังไม่เปลี่ยน กรุณา sign-out แล้ว sign-in ใหม่เพื่อให้มีผล</p>
+        </div>
+      )}
+      {stripeResult === 'cancel' && (
+        <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 text-sm text-gray-700">
+          <p className="text-xs">ยกเลิกการชำระเงินแล้ว — คุณสามารถเลือกแผนและลองใหม่ได้ทุกเมื่อ</p>
+        </div>
+      )}
 
       {/* Pending payment notice */}
       {pendingPayment && (
@@ -754,6 +872,7 @@ export default function PricingPage() {
           plan={selectedPlan}
           promptpayPhone={promptpayPhone}
           omisePublicKey={omisePublicKey}
+          stripeEnabled={stripeEnabled}
           phoneLoading={phoneLoading}
           onClose={() => setSelectedPlan(null)}
           onSuccess={() => {
@@ -768,6 +887,7 @@ export default function PricingPage() {
         <CreditModal
           pack={selectedCredits}
           promptpayPhone={promptpayPhone}
+          stripeEnabled={stripeEnabled}
           onClose={() => setSelectedCredits(null)}
           onSuccess={() => {
             setSelectedCredits(null)

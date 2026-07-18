@@ -2,7 +2,7 @@
 
 ## Last Updated
 
-2026-07-13 — Keep-alive `/api/health` + cron observability (กัน Supabase auto-pause)
+2026-07-18 — Stripe Checkout เป็นช่องทางชำระเงินหลัก (พร้อมจำหน่าย)
 
 ---
 
@@ -22,6 +22,16 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 
 ## Completed
 
+- [x] **💳 Stripe Checkout — ช่องทางชำระเงินหลัก (2026-07-18)**:
+  - `src/lib/stripe.ts` — Stripe client singleton + `STRIPE_ENABLED` + `getBaseUrl()`
+  - `POST /api/stripe/checkout` — สร้าง Checkout Session (plan หรือ credits) + pending Payment → คืน `{ url }` (redirect)
+  - `POST /api/webhooks/stripe` — verify signature (`constructEventAsync`) → `checkout.session.completed`/`async_payment_succeeded` → เปิดแผน/เติมเครดิต + commission (idempotent เช็ค `status==='paid'`); `expired`/`async_payment_failed` → mark failed
+  - `GET /api/stripe/status?session_id=` — poll สถานะสำหรับ success page
+  - `Payment.stripeSessionId` (nullable, additive) — ⚠️ **ต้องรัน `npx prisma db push` เอง** (แตะ production DB)
+  - `/pricing` — Stripe tab (บัตร/PromptPay) เป็นหลักเมื่อ `stripeEnabled`, คง manual PromptPay fallback; รองรับทั้ง PaymentModal + CreditModal + จัดการ redirect `?stripe=success|cancel`
+  - แนวทางจาก `D:\Dev_Proj\d_PDFx\SAAS_DEV_PLAN.md` (Stripe Checkout PromptPay+บัตร THB, webhook idempotent)
+  - **🔥 Fix: `/api/webhooks/*` ไม่เคยเป็น public route** ใน `proxy.ts` → ถ้า go-live webhook จะโดน redirect 307 (คลาสเดียวกับบั๊ก cron) แก้แล้ว
+  - Omise เดิม: ไม่แตะโค้ด ปิดใช้ด้วยการไม่ตั้ง env — เก็บไว้เป็น provider สำรอง
 - [x] **🔥 Fix: auth guard ไม่เคยทำงานบน production (2026-07-13)**:
   - **Next.js 16 เปลี่ยนชื่อ `middleware.ts` → `proxy.ts`** — Security Sprint เขียน logic ไว้ใน `middleware.ts` (root) ซึ่ง Next เมินเงียบ ๆ ไม่มี error
   - ตัวที่รันจริงคือ `src/proxy.ts` เวอร์ชันแรกสุด (public แค่ `login|download|ref|api/auth`)
@@ -208,9 +218,11 @@ Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน A
 > Sprint S01–S13 เขียนโค้ดครบแล้วทั้งหมด — ที่เหลือคือ **ตั้งค่าใน Dashboard + QA** (ไม่ใช่งานโค้ด)
 
 ### ⚙️ ตั้งค่าภายนอก (ทำเองใน Dashboard)
-1. 🔴 **Uptime monitor → `/api/health`** — สมัคร UptimeRobot (ฟรี) ping ทุก 5 นาที กัน Supabase auto-pause + แจ้งเตือนเมื่อ DB ล่ม
-2. 🔴 **Supabase RLS** — รัน SQL script ใน Supabase Dashboard
-3. 🔴 **`OMISE_WEBHOOK_SECRET`** ใน Vercel env — ต้องมีก่อนรับเงิน
+0. 🔴 **`npx prisma db push`** — เพิ่มคอลัมน์ `Payment.stripeSessionId` เข้า production DB (additive/ปลอดภัย แต่ยังไม่รัน)
+1. 🔴 **Stripe go-live** — ตั้ง `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` ใน Vercel env + สร้าง webhook endpoint `/api/webhooks/stripe` ใน Stripe Dashboard (events: checkout.session.completed / async_payment_succeeded / async_payment_failed / expired) + เปิดใช้ PromptPay ในบัญชี Stripe
+2. 🔴 **Uptime monitor → `/api/health`** — สมัคร UptimeRobot (ฟรี) ping ทุก 5 นาที กัน Supabase auto-pause + แจ้งเตือนเมื่อ DB ล่ม
+3. 🔴 **Supabase RLS** — รัน SQL script ใน Supabase Dashboard
+4. ⚪ **`OMISE_WEBHOOK_SECRET`** — เฉพาะถ้าจะใช้ Omise (ตอนนี้ Stripe เป็นหลักแล้ว)
 4. 🔴 **`RESEND_API_KEY`** — ตอนนี้ยังไม่ตั้ง → register auto-verify email (dev mode)
 5. 🟡 **`CRON_SECRET`** ใน Vercel env — ถ้าไม่ตั้ง cron route จะเปิดสาธารณะ
 6. 🟡 **Switch Omise → Live** (`skey_live_`) เมื่อพร้อมรับเงินจริง

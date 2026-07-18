@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-07-18
+
+### 💳 Stripe Checkout — ช่องทางชำระเงินหลัก (พร้อมจำหน่าย)
+
+- Added: **Stripe Checkout (redirect)** รองรับบัตรเครดิต/เดบิต + PromptPay สกุลเงิน THB
+  - หน้า `/pricing` แสดง Stripe เป็นช่องทางหลักเมื่อตั้ง `STRIPE_SECRET_KEY` — ทั้งอัปเกรดแผนและซื้อเครดิต OCR
+  - ชำระสำเร็จ → plan/เครดิตอัปเดตอัตโนมัติผ่าน webhook (ไม่ต้องรอ admin)
+  - คง manual PromptPay ไว้เป็น fallback เสมอ · Omise เดิมยังใช้ได้ถ้าตั้ง env (แนวทางจาก d_PDFx: Stripe เป็นหลัก)
+- Fixed: **payment webhooks ไม่เคยเป็น public route** — `/api/webhooks/*` ไม่อยู่ใน `proxy.ts` PUBLIC_PREFIXES → ถ้า go-live จะโดน auth guard redirect 307 (คลาสเดียวกับบั๊ก cron ที่ทำ Supabase pause) แก้แล้ว ครอบทั้ง Stripe + Omise
+
+---
+
 ## 2026-07-13
 
 ### 🔥 Fix: auth guard ไม่เคยทำงานบน production

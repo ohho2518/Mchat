@@ -22,6 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Forms | React Hook Form v7 + Zod v4 + @hookform/resolvers |
 | Icons | lucide-react |
 | Auth | NextAuth.js v4 (JWT strategy, credentials only) |
+| Payment | Stripe Checkout (บัตร + PromptPay, THB) — ช่องทางหลัก · Omise + manual PromptPay — สำรอง |
 | Database | Supabase PostgreSQL + Prisma ORM v6 |
 | Voice | Web Speech API built-in (lang=th-TH) |
 | OCR | OpenAI GPT-4o-mini (`gpt-4o-mini`, vision detail:low) |
@@ -80,7 +81,10 @@ src/
       ocr-corrections/      ← POST correction, GET admin export
       payments/             ← POST create payment, GET history
       payments/info/        ← GET promptpayPhone + omisePublicKey
-      omise/charge/         ← POST create Omise charge (PromptPay/Card)
+      stripe/checkout/      ← POST create Stripe Checkout Session (plan/credits) → { url } (ช่องทางหลัก)
+      stripe/status/        ← GET poll payment status by session_id
+      webhooks/stripe/      ← POST Stripe webhook → activate plan / grant credits (idempotent)
+      omise/charge/         ← POST create Omise charge (PromptPay/Card) — provider สำรอง
       omise/status/         ← GET poll payment status
       webhooks/omise/       ← POST Omise webhook → activate plan
       referral/code/        ← GET lazy-create referral code
@@ -114,7 +118,8 @@ src/
     features.ts             ← PLAN_LIMITS, PLAN_LABELS, PLAN_COLORS, PLAN_PRICES
     referral.ts             ← generateReferralCode()
     commission.ts           ← COMMISSION_TABLE, getPlanCode, createCommissionAfterPayment()
-    omise.ts                ← Omise client wrapper (createPromptPayCharge, createCardCharge)
+    stripe.ts               ← Stripe client (getStripe, STRIPE_ENABLED, getBaseUrl) — Checkout ช่องทางหลัก
+    omise.ts                ← Omise client wrapper (createPromptPayCharge, createCardCharge) — provider สำรอง
     promptpay.ts            ← EMVCo PromptPay QR payload generator (CRC-16)
     parser/
       parseTransactionText.ts  ← entry point
@@ -200,7 +205,13 @@ DIRECT_URL="postgresql://..."         # Supabase direct URL — ใช้สำ�
 NEXTAUTH_SECRET="..."                 # generate: openssl rand -base64 32
 NEXTAUTH_URL="http://localhost:3000"  # production: https://mchat-git-main-vinit-deekhanu-s-projects.vercel.app
 ANTHROPIC_API_KEY="sk-ant-..."        # Anthropic API key — ใช้สำหรับ OCR สลิป (api/parser/ocr)
+
+# Payment — Stripe เป็นช่องทางหลัก (ถ้าไม่ตั้ง /pricing จะ fallback manual PromptPay)
+STRIPE_SECRET_KEY="sk_test_..."       # สร้าง Checkout Session + verify webhook
+STRIPE_WEBHOOK_SECRET="whsec_..."     # signing secret ของ webhook endpoint /api/webhooks/stripe
 ```
+
+> ⚠️ Webhook (`/api/webhooks/*`) เป็น **public route** ใน `proxy.ts` แล้ว — Stripe/Omise เรียกโดยไม่มี session ต้องไม่โดน auth guard (ความปลอดภัยอยู่ที่ signature verification ในแต่ละ handler)
 
 > ทั้ง `DATABASE_URL` และ `DIRECT_URL` จำเป็นต้องมีทั้งคู่ — ดู URL แต่ละแบบได้ที่ Supabase Dashboard → Settings → Database → Connection string
 
@@ -220,7 +231,7 @@ User types text
 
 ### Auth Flow
 - **`src/proxy.ts`** คือ auth guard ตัวจริง — **Next.js 16 เปลี่ยนชื่อ `middleware.ts` → `proxy.ts`** ถ้าไปเขียน logic ไว้ใน `middleware.ts` Next จะ**เมินเงียบ ๆ ไม่มี error** (เคยพลาดมาแล้ว: public routes + Vercel cron ตายสนิทบน production นาน 1 เดือน จน Supabase pause)
-- ใช้ `withAuth` จาก NextAuth — redirect ทุก route ไป `/login` ยกเว้น PUBLIC_PREFIXES (`/login`, `/download`, `/privacy-policy`, `/terms`, `/ref/*`, `/api/auth/*`, `/api/ref/*`, `/api/referral/terms`, `/api/cron/*`, `/api/health`)
+- ใช้ `withAuth` จาก NextAuth — redirect ทุก route ไป `/login` ยกเว้น PUBLIC_PREFIXES (`/login`, `/download`, `/privacy-policy`, `/terms`, `/ref/*`, `/api/auth/*`, `/api/ref/*`, `/api/referral/terms`, `/api/cron/*`, `/api/health`, `/api/webhooks/*`)
 - JWT token เก็บ `userId` ผ่าน `callbacks.jwt` → `callbacks.session` → `session.user.id`
 - ทุก API route: `getServerSession(authOptions)` → 401 ถ้าไม่มี session
 

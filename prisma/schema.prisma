@@ -321,8 +321,9 @@ model Payment {
   credits       Int?          // set สำหรับ credit purchase (100 / 300 / 500)
   amount        Decimal       @db.Decimal(10, 2)
   status        PaymentStatus @default(pending)
-  method        String        // "promptpay" | "manual"
+  method        String        // "promptpay" | "manual" | "stripe" | "omise_*"
   omiseChargeId String?
+  stripeSessionId String?     // Stripe Checkout Session id (method = "stripe")
   note          String?
   paidAt        DateTime?
   createdAt     DateTime      @default(now())
