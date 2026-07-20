@@ -127,6 +127,8 @@ async function handleRenewal(invoice: Stripe.Invoice) {
   if (!user) return // ยังไม่ได้ผูก subscription (activate ยังไม่มา) → รอ retry
 
   const periodEnd = invoicePeriodEnd(invoice)
+  // อย่าลด planExpiresAt — เผื่อ user ซื้อ one-time เพิ่มไว้ไกลกว่ารอบ subscription (M2)
+  const newExpiry = user.planExpiresAt && user.planExpiresAt > periodEnd ? user.planExpiresAt : periodEnd
   const amountPaid = (invoice.amount_paid ?? 0) / 100
   const renewPlan = user.plan === 'free' ? null : user.plan
 
@@ -148,7 +150,7 @@ async function handleRenewal(invoice: Stripe.Invoice) {
       })
       await tx.user.update({
         where: { id: user.id },
-        data:  { planExpiresAt: periodEnd, subscriptionStatus: 'active' },
+        data:  { planExpiresAt: newExpiry, subscriptionStatus: 'active' },
       })
     })
   } catch (err: unknown) {

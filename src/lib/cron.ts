@@ -5,4 +5,5 @@ export const CRON_LAST_RUN_KEY = 'cron:data-retention:lastRun'
 export type CronRunRecord = {
   ranAt: string
   deleted: Record<string, number>
+  downgradedPlans?: number   // จำนวน user ที่ถูกลดกลับ free เพราะ planExpiresAt หมดอายุ (one-time)
 }

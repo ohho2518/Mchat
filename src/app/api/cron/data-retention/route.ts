@@ -33,11 +33,21 @@ export async function GET(req: Request) {
   twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2)
 
   try {
-    const [events, corrections, auditLogs, rateLimits] = await Promise.all([
+    const [events, corrections, auditLogs, rateLimits, downgraded] = await Promise.all([
       prisma.appEvent.deleteMany({ where: { createdAt: { lt: ninetyDaysAgo } } }),
       prisma.ocrCorrection.deleteMany({ where: { createdAt: { lt: oneYearAgo } } }),
       prisma.auditLog.deleteMany({ where: { createdAt: { lt: twoYearsAgo } } }),
       prisma.rateLimit.deleteMany({ where: { resetAt: { lt: now } } }),
+      // ลดแผนที่หมดอายุกลับ free — เฉพาะ one-time (ไม่มี subscription active)
+      // subscription จะถูก downgrade ตอน customer.subscription.deleted แทน
+      prisma.user.updateMany({
+        where: {
+          plan:                 { not: 'free' },
+          planExpiresAt:        { lt: now },
+          stripeSubscriptionId: null,
+        },
+        data: { plan: 'free', planExpiresAt: null },
+      }),
     ])
 
     const record: CronRunRecord = {
@@ -48,6 +58,7 @@ export async function GET(req: Request) {
         auditLogs:         auditLogs.count,
         expiredRateLimits: rateLimits.count,
       },
+      downgradedPlans: downgraded.count,
     }
 
     // เขียนทุกครั้งแม้ไม่มีอะไรถูกลบ — เป็นหลักฐานว่า cron รันจริง (ดูผ่าน /api/health)

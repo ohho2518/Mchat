@@ -78,6 +78,25 @@ export async function POST(req: Request) {
   try {
     const stripe = getStripe()
 
+    // ── C1: กัน double-subscribe → double-billing ────────────────────────────
+    // ถ้ามี subscription ที่ยังเดินอยู่ (active/past_due) ห้ามสมัครใหม่ซ้ำ
+    // (User.stripeSubscriptionId เก็บได้ตัวเดียว — สมัครซ้ำจะทำให้ตัวเดิมกลายเป็น orphan ที่ตัดบัตรต่อโดยยกเลิกไม่ได้)
+    if (isSubscription) {
+      const existing = await prisma.user.findUnique({
+        where:  { id: userId },
+        select: { stripeSubscriptionId: true, subscriptionStatus: true },
+      })
+      if (
+        existing?.stripeSubscriptionId &&
+        (existing.subscriptionStatus === 'active' || existing.subscriptionStatus === 'past_due')
+      ) {
+        return NextResponse.json(
+          { error: 'คุณมีการต่ออายุอัตโนมัติอยู่แล้ว — จัดการหรือยกเลิกได้ที่หน้าตั้งค่าก่อน' },
+          { status: 409 },
+        )
+      }
+    }
+
     // ── สร้าง pending Payment ก่อน (ได้ id ไว้ผูกกับ metadata) ──────────────────
     // ยกเลิก pending stripe เดิมที่ยังค้าง (checkout ที่ผู้ใช้ทิ้งไว้) — กัน pending ค้าง
     await prisma.payment.updateMany({
