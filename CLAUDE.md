@@ -81,8 +81,9 @@ src/
       ocr-corrections/      ← POST correction, GET admin export
       payments/             ← POST create payment, GET history
       payments/info/        ← GET promptpayPhone + omisePublicKey
-      stripe/checkout/      ← POST create Stripe Checkout Session (plan/credits) → { url } (ช่องทางหลัก)
+      stripe/checkout/      ← POST create Stripe Checkout Session (plan/credits) → { url } (ช่องทางหลัก) — autoRenew=true → subscription รายเดือน
       stripe/status/        ← GET poll payment status by session_id
+      stripe/subscription/  ← GET สถานะ auto-renew · POST cancel/resume (cancel_at_period_end)
       webhooks/stripe/      ← POST Stripe webhook → activate plan / grant credits (idempotent)
       omise/charge/         ← POST create Omise charge (PromptPay/Card) — provider สำรอง
       omise/status/         ← GET poll payment status
@@ -270,7 +271,9 @@ User กดปุ่มกล้อง → เลือกรูป/ถ่าย
 - Transfer/Debt type ไม่นับใน dashboard sum (filter `type: { in: ['income','expense'] }`)
 - Schema มี model: `User`, `Account`, `Category`, `CategoryKeyword`, `Transaction`, `Transfer`, `Debt`, `AppEvent`, `Feedback`, `OcrCorrection`, `ReferralCode`, `Referral`, `Commission`, `PayoutRequest`, `SiteSetting`, `UsageQuota`, `Payment`
 - `Transaction` มี field `holderName` (String?) — ชื่อคู่ค้าจากสลิป OCR
-- `User` มี field `plan` (FREE/PRO/MAX), `planExpiresAt`
+- `User` มี field `plan` (FREE/PRO/MAX), `planExpiresAt`, `stripeCustomerId`, `stripeSubscriptionId`, `subscriptionStatus` (auto-renew)
+- `Payment` มี `stripeSessionId`, `stripeSubscriptionId`, `stripeInvoiceId` (unique — กัน webhook เติม renewal ซ้ำ)
+- Auto-renew = Stripe subscription รายเดือน (`mode:'subscription'`, บัตรอย่างเดียว เพราะ PromptPay recur ไม่ได้) — คู่ขนานกับ one-time เดิม
 - CRUD API+UI ครบ: accounts, transfers, debts
 
 ---

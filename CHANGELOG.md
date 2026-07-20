@@ -4,6 +4,24 @@
 
 ---
 
+## 2026-07-20
+
+### 🔁 Auto-renew — ต่ออายุแผนอัตโนมัติ (Stripe Subscription รายเดือน)
+
+- Added: ตัวเลือก **"ต่ออายุอัตโนมัติทุกเดือน"** ในหน้าจ่ายเงิน (Stripe tab) — คู่ขนานกับจ่ายครั้งเดียวเดิม
+  - เปิด toggle → สมัคร subscription รายเดือน (PRO ฿99/เดือน, MAX ฿249/เดือน) ตัดบัตรอัตโนมัติ
+  - บัตรอย่างเดียว (PromptPay ไม่รองรับ recurring) · จ่ายครั้งเดียว 1/3/6/12 เดือนยังใช้ได้เหมือนเดิม
+  - webhook เลื่อนวันหมดอายุให้อัตโนมัติทุกรอบ (`invoice.paid`) — idempotent ด้วย invoice id
+- Added: **จัดการ subscription ในหน้า `/settings`** — ดูสถานะ, วันต่ออายุถัดไป, ยกเลิก/กลับมาต่อ (ยกเลิกแบบสิ้นรอบ ยังใช้ได้จนหมดอายุที่จ่ายไว้)
+- Note: ต้องเพิ่ม event `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated/deleted` ใน Stripe webhook endpoint
+
+### 🔒 Hardening
+
+- Fixed: `getBaseUrl` / `STRIPE_WEBHOOK_SECRET` — `.trim()` ช่องว่างจาก env (Vercel copy-paste ติดช่องว่าง → checkout 500 / webhook 401)
+- Added: `prisma/enable-rls.sql` — เปิด Row Level Security ทุกตาราง (กัน Supabase auto-API)
+
+---
+
 ## 2026-07-18
 
 ### 💳 Stripe Checkout — ช่องทางชำระเงินหลัก (พร้อมจำหน่าย)
