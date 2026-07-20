@@ -20,7 +20,10 @@ export const STRIPE_ENABLED = Boolean(process.env.STRIPE_SECRET_KEY)
 // (Origin ปลอมได้ → success_url/cancel_url ชี้ไปโดเมนปลอมเพื่อ phishing หลังจ่ายเงิน)
 // เหลือ Origin ไว้เป็น dev fallback เท่านั้น กรณีไม่ได้ตั้ง NEXTAUTH_URL
 export function getBaseUrl(req: Request): string {
-  const configured = process.env.NEXTAUTH_URL
-  if (configured) return configured.replace(/\/+$/, '')
-  return req.headers.get('origin') ?? 'http://localhost:3000'
+  // .trim() สำคัญ — env จาก Vercel มักมีช่องว่าง/newline ติดท้ายเวลา copy-paste
+  // ถ้าไม่ trim จะได้ success_url แบบ "https://x.app  /pricing" → Stripe ปฏิเสธ (Invalid URL) → 500
+  const configured = process.env.NEXTAUTH_URL?.trim().replace(/\/+$/, '')
+  if (configured) return configured
+  const origin = req.headers.get('origin')?.trim()
+  return origin || 'http://localhost:3000'
 }
