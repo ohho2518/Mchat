@@ -71,6 +71,10 @@ export default function SettingsPage() {
   } | null>(null)
   const [ocrConsent, setOcrConsent] = useState<boolean | null>(null)
   const [consentLoading, setConsentLoading] = useState(false)
+  const [sub, setSub] = useState<{
+    hasSubscription: boolean; status: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean
+  } | null>(null)
+  const [subLoading, setSubLoading] = useState(false)
 
   useEffect(() => {
     const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e) }
@@ -89,7 +93,29 @@ export default function SettingsPage() {
       .then(r => r.json())
       .then((data: { type: string }[]) => setOcrConsent(data.length > 0))
       .catch(() => {})
+    fetch('/api/stripe/subscription')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setSub(data) })
+      .catch(() => {})
   }, [])
+
+  const changeSubscription = async (action: 'cancel' | 'resume') => {
+    if (action === 'cancel' && !confirm('ยกเลิกการต่ออายุอัตโนมัติ? คุณยังใช้แผนได้จนถึงวันสิ้นสุดรอบปัจจุบัน')) return
+    setSubLoading(true)
+    try {
+      const res = await fetch('/api/stripe/subscription', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action }),
+      })
+      if (res.ok) {
+        const { cancelAtPeriodEnd } = await res.json()
+        setSub(prev => prev ? { ...prev, cancelAtPeriodEnd } : prev)
+      }
+    } finally {
+      setSubLoading(false)
+    }
+  }
 
   const toggleOcrConsent = async (agreed: boolean) => {
     setConsentLoading(true)
@@ -241,6 +267,42 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between rounded-lg bg-purple-50 border border-purple-100 px-3 py-2">
                   <span className="text-xs text-purple-700">เครดิต OCR เสริม</span>
                   <span className="text-sm font-semibold text-purple-700">{quota.ocrCredits} ครั้ง</span>
+                </div>
+              )}
+
+              {/* Auto-renew subscription management */}
+              {sub?.hasSubscription && (
+                <div className={`rounded-lg border p-3 text-xs space-y-1.5 ${
+                  sub.cancelAtPeriodEnd ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`font-semibold ${sub.cancelAtPeriodEnd ? 'text-amber-700' : 'text-green-700'}`}>
+                      {sub.cancelAtPeriodEnd ? 'ต่ออายุอัตโนมัติ: จะยกเลิก' : 'ต่ออายุอัตโนมัติ: เปิดอยู่'}
+                    </span>
+                  </div>
+                  {sub.currentPeriodEnd && (
+                    <p className="text-gray-500">
+                      {sub.cancelAtPeriodEnd ? 'ใช้ได้ถึง' : 'ต่ออายุถัดไป'}{' '}
+                      {new Date(sub.currentPeriodEnd).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  )}
+                  {sub.cancelAtPeriodEnd ? (
+                    <button
+                      onClick={() => changeSubscription('resume')}
+                      disabled={subLoading}
+                      className="w-full rounded-lg bg-green-600 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                    >
+                      กลับมาต่ออายุ
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => changeSubscription('cancel')}
+                      disabled={subLoading}
+                      className="w-full rounded-lg border border-gray-300 bg-white py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      ยกเลิกการต่ออายุ
+                    </button>
+                  )}
                 </div>
               )}
 

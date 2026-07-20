@@ -36,6 +36,10 @@ model User {
   plan               Plan      @default(free)
   planExpiresAt      DateTime?
   ocrCredits         Int       @default(0)
+  // ── Stripe subscription (auto-renew) — nullable; ผู้ใช้ one-time จะเป็น null ──
+  stripeCustomerId     String? @unique   // reuse ข้ามหลาย subscription/ครั้ง
+  stripeSubscriptionId String? @unique   // subscription ที่ active อยู่ (null = ไม่มี auto-renew)
+  subscriptionStatus   String?           // "active" | "past_due" | "canceled" (null = ไม่เคย subscribe)
   emailVerified      DateTime?
   emailVerifyToken   String?   @unique
   createdAt          DateTime  @default(now())
@@ -324,6 +328,8 @@ model Payment {
   method        String        // "promptpay" | "manual" | "stripe" | "omise_*"
   omiseChargeId String?
   stripeSessionId String?     // Stripe Checkout Session id (method = "stripe")
+  stripeSubscriptionId String? // set เมื่อเป็นการชำระผ่าน subscription (auto-renew)
+  stripeInvoiceId String? @unique // invoice id ของรอบ renewal — unique กัน webhook เติมซ้ำ
   note          String?
   paidAt        DateTime?
   createdAt     DateTime      @default(now())

@@ -74,6 +74,7 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, stripeEnabled, pho
   const omiseEnabled = Boolean(omisePublicKey)
   const [tab,      setTab]     = useState<PaymentTab>(stripeEnabled ? 'stripe' : omiseEnabled ? 'omise_promptpay' : 'manual')
   const [period,   setPeriod]  = useState(PERIOD_OPTIONS[0])
+  const [autoRenew, setAutoRenew] = useState(false)  // Stripe subscription (รายเดือน)
   const [refCode,  setRefCode] = useState('')
   const [loading,  setLoading] = useState(false)
   const [sent,     setSent]    = useState(false)
@@ -103,6 +104,9 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, stripeEnabled, pho
 
   // Cleanup polling on unmount
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+
+  // auto-renew รองรับเฉพาะ Stripe → ออกจากแท็บ stripe ให้ปิดอัตโนมัติ
+  useEffect(() => { if (tab !== 'stripe') setAutoRenew(false) }, [tab])
 
   // Load Omise.js for card tab
   useEffect(() => {
@@ -184,7 +188,12 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, stripeEnabled, pho
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'plan', plan, months: period.months, amount, refCode: refCode.trim() || undefined }),
+        body: JSON.stringify({
+          kind: 'plan', plan,
+          months: autoRenew ? 1 : period.months,
+          autoRenew,
+          refCode: refCode.trim() || undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok || !data.url) { setError(data.error ?? 'ไม่สามารถเริ่มการชำระได้'); return }
@@ -254,34 +263,43 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, stripeEnabled, pho
               <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
             </div>
 
-            {/* Period selector */}
-            <div className="grid grid-cols-4 gap-1.5 mb-4">
-              {PERIOD_OPTIONS.map((opt) => (
-                <button
-                  key={opt.months}
-                  onClick={() => setPeriod(opt)}
-                  className={cn(
-                    'rounded-xl py-2 text-xs font-medium border transition-colors',
-                    period.months === opt.months
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'text-gray-600 border-gray-200 hover:border-blue-300'
-                  )}
-                >
-                  {opt.label}
-                  {opt.discount > 0 && (
-                    <span className="block text-[10px] opacity-80">ลด {Math.round(opt.discount * 100)}%</span>
-                  )}
-                </button>
-              ))}
-            </div>
+            {/* Period selector — ซ่อนเมื่อ auto-renew (subscription = รายเดือนเสมอ) */}
+            {autoRenew ? (
+              <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50/50 py-2 text-center text-xs font-medium text-blue-600">
+                รายเดือน · ต่ออายุอัตโนมัติทุกเดือน
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 gap-1.5 mb-4">
+                {PERIOD_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.months}
+                    onClick={() => setPeriod(opt)}
+                    className={cn(
+                      'rounded-xl py-2 text-xs font-medium border transition-colors',
+                      period.months === opt.months
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'text-gray-600 border-gray-200 hover:border-blue-300'
+                    )}
+                  >
+                    {opt.label}
+                    {opt.discount > 0 && (
+                      <span className="block text-[10px] opacity-80">ลด {Math.round(opt.discount * 100)}%</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Price summary */}
             <div className="rounded-xl bg-blue-50 p-3 mb-4 text-center">
               <p className="text-xs text-blue-600 mb-0.5">ยอดชำระ</p>
-              <p className="text-3xl font-bold text-blue-700">฿{amount.toLocaleString()}</p>
+              <p className="text-3xl font-bold text-blue-700">
+                ฿{amount.toLocaleString()}
+                {autoRenew && <span className="text-base font-medium text-blue-500">/เดือน</span>}
+              </p>
               <p className="text-xs text-blue-500">
-                {PLAN_LABELS[plan]} · {period.label}
-                {period.discount > 0 && (
+                {PLAN_LABELS[plan]} · {autoRenew ? 'ต่ออายุอัตโนมัติ' : period.label}
+                {!autoRenew && period.discount > 0 && (
                   <span className="ml-1 line-through text-gray-400">฿{(base * period.months).toLocaleString()}</span>
                 )}
               </p>
@@ -320,10 +338,29 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, stripeEnabled, pho
             {/* ── Tab: Stripe Checkout (redirect) ── */}
             {tab === 'stripe' && (
               <div className="flex flex-col items-center py-4 space-y-3 mb-4">
+                {/* Auto-renew toggle */}
+                <button
+                  type="button"
+                  onClick={() => setAutoRenew((v) => !v)}
+                  className={cn(
+                    'w-full flex items-center justify-between rounded-xl border px-3 py-2.5 transition-colors',
+                    autoRenew ? 'border-blue-400 bg-blue-50' : 'border-gray-200'
+                  )}
+                >
+                  <span className="flex flex-col items-start">
+                    <span className="text-xs font-semibold text-gray-800">ต่ออายุอัตโนมัติทุกเดือน</span>
+                    <span className="text-[10px] text-gray-400">ตัดบัตรอัตโนมัติ ยกเลิกได้ทุกเมื่อในหน้าตั้งค่า</span>
+                  </span>
+                  <span className={cn('relative h-5 w-9 rounded-full transition-colors', autoRenew ? 'bg-blue-600' : 'bg-gray-300')}>
+                    <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all', autoRenew ? 'left-4.5' : 'left-0.5')} style={{ left: autoRenew ? '1.125rem' : '0.125rem' }} />
+                  </span>
+                </button>
+
                 <CreditCard className="h-12 w-12 text-gray-300" />
                 <p className="text-sm text-gray-500 text-center">
-                  ชำระด้วยบัตรเครดิต/เดบิต หรือ PromptPay<br/>
-                  ผ่านหน้าชำระเงินที่ปลอดภัยของ Stripe
+                  {autoRenew
+                    ? <>ตัดบัตรเครดิต/เดบิตอัตโนมัติทุกเดือน<br/>ผ่านหน้าชำระเงินที่ปลอดภัยของ Stripe</>
+                    : <>ชำระด้วยบัตรเครดิต/เดบิต หรือ PromptPay<br/>ผ่านหน้าชำระเงินที่ปลอดภัยของ Stripe</>}
                 </p>
                 <button
                   onClick={createStripeCheckout}
@@ -331,10 +368,12 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, stripeEnabled, pho
                   className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-                  {loading ? 'กำลังเชื่อมต่อ...' : `ชำระ ฿${amount.toLocaleString()}`}
+                  {loading ? 'กำลังเชื่อมต่อ...' : autoRenew ? `สมัคร ฿${amount.toLocaleString()}/เดือน` : `ชำระ ฿${amount.toLocaleString()}`}
                 </button>
                 <p className="text-xs text-gray-400 text-center">
-                  Plan จะอัปเดตอัตโนมัติหลังชำระสำเร็จ · ข้อมูลบัตรจัดการโดย Stripe
+                  {autoRenew
+                    ? 'auto-renew ใช้บัตรเท่านั้น (PromptPay ไม่รองรับ) · ยกเลิกได้ที่หน้าตั้งค่า'
+                    : 'Plan จะอัปเดตอัตโนมัติหลังชำระสำเร็จ · ข้อมูลบัตรจัดการโดย Stripe'}
                 </p>
               </div>
             )}
