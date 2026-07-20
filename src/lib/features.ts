@@ -77,6 +77,24 @@ export function findCreditPack(credits: number): CreditPack | undefined {
   return CREDIT_PACKS.find((p) => p.credits === credits)
 }
 
+// แผนที่มีผลจริง ณ ตอนนี้ (read-time) — กัน plan ค้างหลังหมดอายุ
+// - subscription active/past_due → คงแผนไว้เสมอ (renewal อาจมาช้า ไม่ลดก่อน)
+// - one-time / subscription ที่จบแล้ว → ลดเป็น free เมื่อเลย planExpiresAt
+export function effectivePlan(
+  plan: Plan,
+  planExpiresAt: Date | null,
+  stripeSubscriptionId: string | null,
+  subscriptionStatus: string | null,
+): Plan {
+  if (plan === 'free') return 'free'
+  const hasActiveSub =
+    Boolean(stripeSubscriptionId) &&
+    (subscriptionStatus === 'active' || subscriptionStatus === 'past_due')
+  if (hasActiveSub) return plan
+  if (planExpiresAt && planExpiresAt.getTime() < Date.now()) return 'free'
+  return plan
+}
+
 // Thai timezone month string (UTC+7) — used for OCR quota keying
 export function getThaiMonth(): string {
   const TH_OFFSET_MS = 7 * 60 * 60 * 1000

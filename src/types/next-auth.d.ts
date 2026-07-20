@@ -21,5 +21,6 @@ declare module 'next-auth/jwt' {
   interface JWT {
     userId?: string
     plan?: Plan
+    planSyncedAt?: number   // epoch ms ครั้งล่าสุดที่ refresh plan จาก DB (throttle)
   }
 }
