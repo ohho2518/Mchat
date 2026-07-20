@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Check, X, Zap, QrCode, Loader2, Download, CreditCard, Smartphone, ArrowRight } from 'lucide-react'
+import { Check, X, Zap, QrCode, Loader2, Download, CreditCard, ArrowRight } from 'lucide-react'
 import { PLAN_LABELS, PLAN_PRICES, PLAN_COLORS, CREDIT_PACKS } from '@/lib/features'
 import type { CreditPack } from '@/lib/features'
 import { generatePromptPayPayload, formatThaiPhone } from '@/lib/promptpay'
@@ -71,8 +71,7 @@ interface PaymentModalProps {
 }
 
 function PaymentModal({ plan, promptpayPhone, omisePublicKey, stripeEnabled, phoneLoading, onClose, onSuccess }: PaymentModalProps) {
-  const omiseEnabled = Boolean(omisePublicKey)
-  const [tab,      setTab]     = useState<PaymentTab>(stripeEnabled ? 'stripe' : omiseEnabled ? 'omise_promptpay' : 'manual')
+  const [tab,      setTab]     = useState<PaymentTab>(stripeEnabled ? 'stripe' : 'manual')
   const [period,   setPeriod]  = useState(PERIOD_OPTIONS[0])
   const [autoRenew, setAutoRenew] = useState(false)  // Stripe subscription (รายเดือน)
   const [refCode,  setRefCode] = useState('')
@@ -233,13 +232,12 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, stripeEnabled, pho
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
 
+  // Omise ปิดใช้แล้ว (ใช้ Stripe เป็นหลัก) — เหลือ Stripe + โอนเอง (manual PromptPay QR)
   const TABS: { key: PaymentTab; label: string; icon: React.ReactNode; show: boolean }[] = [
     { key: 'stripe',          label: 'บัตร/PromptPay', icon: <CreditCard className="h-3.5 w-3.5" />, show: stripeEnabled },
-    { key: 'omise_promptpay', label: 'PromptPay',  icon: <Smartphone className="h-3.5 w-3.5" />, show: omiseEnabled },
-    { key: 'omise_card',      label: 'บัตร',        icon: <CreditCard className="h-3.5 w-3.5" />,  show: omiseEnabled },
     { key: 'manual',          label: 'โอนเอง',      icon: <QrCode className="h-3.5 w-3.5" />,      show: true },
   ]
-  const showTabBar = stripeEnabled || omiseEnabled
+  const showTabBar = stripeEnabled
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
