@@ -4,7 +4,13 @@
 
 ---
 
-## 2026-07-20
+## 2026-07-20 — 🚀 GO-LIVE / PRODUCTION · ON SALE
+
+**MChat เปิดขายจริงแล้ว** — สลับ Stripe เป็น LIVE mode + ทดสอบชำระเงินจริงผ่านครบทุก flow
+- Stripe LIVE: บัตร + PromptPay (ทดสอบจ่ายจริง ฿99 → webhook 200 → เปิดแผนสำเร็จ)
+- webhook endpoint live "MChat production" (8 events) · Vercel env (sk_live + whsec live)
+- ผ่าน adversarial payment review ก่อน go-live: กัน double-subscribe (C1), plan หมดอายุ downgrade (H1: cron + read-time), renewal ไม่ลบเวลา one-time (M2)
+- Supabase RLS เปิดครบ 21 ตาราง · UptimeRobot กัน DB pause
 
 ### 🔁 Auto-renew — ต่ออายุแผนอัตโนมัติ (Stripe Subscription รายเดือน)
 

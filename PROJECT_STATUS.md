@@ -1,22 +1,29 @@
 # PROJECT_STATUS.md
 
+## 🚀 STATUS: GO-LIVE — PRODUCTION · ON SALE (2026-07-20)
+
+**MChat เปิดรับเงินจริงแล้ว** — Stripe LIVE mode ทำงานครบ (บัตร + PromptPay + auto-renew) ยืนยันด้วยการชำระจริง ฿99 ผ่านตลอด flow (checkout → webhook 200 → fulfill → เปิดแผน)
+
+---
+
 ## Last Updated
 
-2026-07-18 — Stripe Checkout เป็นช่องทางชำระเงินหลัก (พร้อมจำหน่าย)
+2026-07-20 — 🚀 GO-LIVE / Production On Sale (Stripe live + auto-renew)
 
 ---
 
 ## Current Goal
 
-MVP สมบูรณ์แล้ว — ขั้นตอนถัดไปคือ QA/UAT ใน production, เพิ่ม feature ตาม feedback ผู้ใช้จริง
+**On sale.** รับลูกค้าจริงได้แล้ว — ขั้นถัดไป: monitor production, เก็บ feedback ผู้ใช้จริง, เพิ่ม feature ตามความต้องการ
 
 ---
 
 ## Current State
 
-**Production-ready MVP.** ทุก Phase (0–7) เสร็จสมบูรณ์และ deploy บน Vercel + Supabase แล้ว  
+**🟢 LIVE / ON SALE.** Deploy บน Vercel (`mchat-git-main-vinit-deekhanu-s-projects.vercel.app`) + Supabase (RLS เปิดครบ 21 ตาราง) + UptimeRobot กัน DB pause  
+Payment: **Stripe LIVE** (บัตร + PromptPay + auto-renew subscription รายเดือน) · webhook live 8 events · ผ่าน code review + adversarial payment review (C1/H1/M2 + read-time plan enforcement)  
 Parser ผ่าน 44/44 test cases, PWA ติดตั้งได้บน Android/iOS, Voice input ทำงานบน Chrome/Safari/Edge  
-ผ่าน security & bug fix pass (15 issues จาก code review — Critical/High/Medium ทั้งหมดแก้แล้ว)
+Stripe account ใช้ร่วมกับ d_PDFx (`dPRO ai INNOTECH`) — key/PromptPay ใช้ร่วม, webhook แยก endpoint
 
 ---
 
