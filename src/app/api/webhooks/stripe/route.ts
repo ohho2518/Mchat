@@ -53,7 +53,9 @@ async function fulfill(sessionObj: Stripe.Checkout.Session) {
 export async function POST(req: Request) {
   if (!STRIPE_ENABLED) return NextResponse.json({ ok: true })
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+  // .trim() สำคัญ — whsec ที่ copy มาใส่ Vercel มักมีช่องว่าง/newline ติดท้าย
+  // ถ้าไม่ trim จะ verify signature ไม่ผ่าน → 401 ทุก event (fulfill ไม่เกิด)
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim()
   if (!webhookSecret) {
     console.error('[stripe webhook] STRIPE_WEBHOOK_SECRET not set — rejecting')
     return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
