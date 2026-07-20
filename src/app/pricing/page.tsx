@@ -196,7 +196,7 @@ function PaymentModal({ plan, promptpayPhone, omisePublicKey, stripeEnabled, pho
         }),
       })
       const data = await res.json()
-      if (!res.ok || !data.url) { setError(data.error ?? 'ไม่สามารถเริ่มการชำระได้'); return }
+      if (!res.ok || !data.url) { setError(data.error ?? 'ไม่สามารถเริ่มการชำระได้'); setLoading(false); return }
       window.location.assign(data.url)   // redirect ไป Stripe Checkout
     } catch { setError('ไม่สามารถเชื่อมต่อ Stripe ได้'); setLoading(false) }
     // ไม่ต้อง setLoading(false) เมื่อสำเร็จ — กำลัง redirect ออกจากหน้า
@@ -542,7 +542,7 @@ function CreditModal({ pack, promptpayPhone, stripeEnabled, onClose, onSuccess }
         body:    JSON.stringify({ kind: 'credits', credits: pack.credits, amount: pack.price }),
       })
       const data = await res.json()
-      if (!res.ok || !data.url) { setError(data.error ?? 'ไม่สามารถเริ่มการชำระได้'); return }
+      if (!res.ok || !data.url) { setError(data.error ?? 'ไม่สามารถเริ่มการชำระได้'); setLoading(false); return }
       window.location.assign(data.url)
     } catch { setError('ไม่สามารถเชื่อมต่อ Stripe ได้'); setLoading(false) }
   }
